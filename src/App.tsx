@@ -11,6 +11,7 @@ import {
   FileCode2,
   FileSpreadsheet,
   FlaskConical,
+  Grid2x2,
   Image as ImageIcon,
   Layers,
   Moon,
@@ -90,6 +91,17 @@ import { UpSetPlot } from './components/plots/UpSetPlot';
 import { PathwayLollipopPlot } from './components/plots/PathwayLollipopPlot';
 import { AntiBarplotCanvas } from './components/plots/AntiBarplotCanvas';
 import { StatAdvisorPanel } from './components/stats/StatAdvisorPanel';
+import { LaymanStatsGuide } from './components/stats/LaymanStatsGuide';
+import { JournalCaseRenderer } from './components/plots/JournalCaseRenderer';
+import {
+  JOURNAL_CASES_20,
+  type CaseCategory,
+  type JournalCaseId,
+} from './lib/journalCasesCatalog';
+import {
+  generateJournalCasePythonCode,
+  generateJournalCaseRCode,
+} from './lib/journalCasesCodeGen';
 
 export function App() {
   const [studio, setStudio] = useState<StudioMode>('plotter');
@@ -102,6 +114,8 @@ export function App() {
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [uploadBanner, setUploadBanner] = useState<string | null>(null);
   const [geneQuery, setGeneQuery] = useState('');
+  const [activeCaseId, setActiveCaseId] = useState<JournalCaseId>('03-multi-volcano');
+  const [caseCategoryFilter, setCaseCategoryFilter] = useState<'All' | CaseCategory>('All');
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -195,13 +209,26 @@ export function App() {
     ]
   );
 
+  const activeCase = useMemo(
+    () => JOURNAL_CASES_20.find((c) => c.id === activeCaseId) ?? JOURNAL_CASES_20[0],
+    [activeCaseId]
+  );
+
+  const filteredCases = useMemo(
+    () =>
+      caseCategoryFilter === 'All'
+        ? JOURNAL_CASES_20
+        : JOURNAL_CASES_20.filter((c) => c.category === caseCategoryFilter),
+    [caseCategoryFilter]
+  );
+
   // ---------------- Shared Style Updaters ----------------
-  const activeStyle: PublicationStyleSettings = studio === 'plotter' ? deConfig : statsConfig;
+  const activeStyle: PublicationStyleSettings = studio === 'stats' ? statsConfig : deConfig;
   const resolvedTheme = useMemo(() => resolvePlotTheme(activeStyle), [activeStyle]);
 
   const patchActiveStyle = (patch: Partial<PublicationStyleSettings>) => {
-    if (studio === 'plotter') setDeConfig((p) => ({ ...p, ...patch }));
-    else setStatsConfig((p) => ({ ...p, ...patch }));
+    if (studio === 'stats') setStatsConfig((p) => ({ ...p, ...patch }));
+    else setDeConfig((p) => ({ ...p, ...patch }));
   };
 
   const applyJournalPreset = (journalId: JournalPresetId) => {
@@ -343,6 +370,24 @@ export function App() {
   };
 
   const generatedCode = useMemo(() => {
+    if (studio === 'gallery') {
+      return {
+        r: generateJournalCaseRCode(
+          activeCase.id,
+          activeCase.title,
+          activeCase.journalSource,
+          deConfig
+        ),
+        python: generateJournalCasePythonCode(
+          activeCase.id,
+          activeCase.title,
+          activeCase.journalSource,
+          deConfig
+        ),
+        cli: `# Open-source ggplot2-20-journal-cases recipe (${activeCase.number} · ${activeCase.title})\n# Run the R script exported from BioGrace:\nRscript biograce_${activeCase.id}.R`,
+        baseName: `biograce_${activeCase.id}_${deConfig.preset}`,
+      };
+    }
     if (studio === 'plotter') {
       return {
         r: generateDERCode(deConfig, deSourceFile),
@@ -357,7 +402,7 @@ export function App() {
       cli: generateStatsCliCommand(statsConfig, statsSourceFile),
       baseName: `biograce_${statsConfig.plotType}_${statsConfig.preset}`,
     };
-  }, [studio, deConfig, deSourceFile, statsConfig, statsAnalysis, statsSourceFile]);
+  }, [studio, activeCase, deConfig, deSourceFile, statsConfig, statsAnalysis, statsSourceFile]);
 
   const handleCopy = async (key: string, text: string) => {
     await navigator.clipboard.writeText(text);
@@ -452,8 +497,13 @@ export function App() {
                 options={[
                   {
                     value: 'plotter',
-                    label: 'DE & Single-Cell Plotter',
+                    label: 'DE & Single-Cell',
                     icon: <Activity className="w-3.5 h-3.5" />,
+                  },
+                  {
+                    value: 'gallery',
+                    label: '20 Journal Figures',
+                    icon: <Grid2x2 className="w-3.5 h-3.5" />,
                   },
                   {
                     value: 'stats',
@@ -527,8 +577,9 @@ export function App() {
               fullWidth
               size="sm"
               options={[
-                { value: 'plotter', label: 'DE & Single-Cell', icon: <Activity className="w-3.5 h-3.5" /> },
-                { value: 'stats', label: 'Stat Advisor & Anti-Barplot', icon: <FlaskConical className="w-3.5 h-3.5" /> },
+                { value: 'plotter', label: 'DE & scRNA', icon: <Activity className="w-3.5 h-3.5" /> },
+                { value: 'gallery', label: '20 Journals', icon: <Grid2x2 className="w-3.5 h-3.5" /> },
+                { value: 'stats', label: 'Stat Advisor', icon: <FlaskConical className="w-3.5 h-3.5" /> },
               ]}
             />
           </div>
@@ -538,7 +589,73 @@ export function App() {
         <main className="flex-1 max-w-[1460px] w-full mx-auto px-4 sm:px-6 py-5 grid grid-cols-1 lg:grid-cols-[356px_minmax(0,1fr)] gap-6 items-start">
           {/* LEFT INSPECTOR SIDEBAR */}
           <aside className="material-sidebar rounded-3xl border p-5 space-y-5 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6.2rem)] lg:overflow-y-auto scroll-mask-y">
-            {studio === 'plotter' ? (
+            {studio === 'gallery' ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="type-label text-[11px] font-semibold uppercase text-[var(--text-tertiary)]">
+                    20 Open-Source Journal Figures
+                  </label>
+                  <span className="text-[10px] font-medium text-[var(--text-tertiary)]">MIT Gallery</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {(
+                    [
+                      'All',
+                      'Distribution & Stats',
+                      'Genomics & Clinical',
+                      'Networks & Flows',
+                      'Heatmaps & Composition',
+                    ] as const
+                  ).map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onPointerDown={() => {
+                        setCaseCategoryFilter(cat);
+                        playAppleTick(soundEnabled, 'select');
+                      }}
+                      className={`apple-press px-2 py-1 rounded-lg text-[10.5px] font-semibold ${
+                        caseCategoryFilter === cat
+                          ? 'bg-[var(--accent)] text-white'
+                          : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)]'
+                      }`}
+                    >
+                      {cat === 'All' ? 'All (20)' : cat.split(' & ')[0]}
+                    </button>
+                  ))}
+                </div>
+                <div className="space-y-1.5 max-h-[310px] overflow-y-auto pr-1 scroll-mask-y">
+                  {filteredCases.map((item) => {
+                    const active = item.id === activeCase.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onPointerDown={() => {
+                          setActiveCaseId(item.id);
+                          playAppleTick(soundEnabled, 'select');
+                        }}
+                        className={`apple-press w-full px-2.5 py-2 rounded-xl text-left border transition-colors ${
+                          active
+                            ? 'bg-[var(--accent)]/12 border-[var(--accent)]/50'
+                            : 'bg-[var(--bg-elevated)]/65 border-[var(--border-hairline)] hover:bg-[var(--bg-elevated)]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-semibold text-[var(--text-primary)] truncate">
+                            <span className="font-mono text-[var(--accent)] mr-1.5">{item.number}</span>
+                            {item.title}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 text-[10px] text-[var(--text-tertiary)]">
+                          {item.journalSource} · {item.rPackages.join(', ')}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : studio === 'plotter' ? (
               <>
                 {/* Plot Type Selector */}
                 <div>
@@ -1093,11 +1210,14 @@ export function App() {
                 <h1 className="type-display text-2xl sm:text-3xl font-bold text-[var(--text-primary)]">
                   {studio === 'plotter'
                     ? 'DE & Single-Cell Publication Plotter'
+                    : studio === 'gallery'
+                    ? `${activeCase.number} · ${activeCase.title}`
                     : "Biologist's Statistical Advisor & Anti-Barplot Studio"}
                 </h1>
                 <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-1 tabular-nums">
-                  {resolvedTheme.journal.name} ({resolvedTheme.widthMm} mm) · {resolvedTheme.palette.name} ·{' '}
-                  {activeStyle.fontFamily} · {activeStyle.dpi} DPI
+                  {studio === 'gallery'
+                    ? `${activeCase.journalSource} archetype · ${resolvedTheme.journal.name} (${resolvedTheme.widthMm} mm) · ${resolvedTheme.palette.name}`
+                    : `${resolvedTheme.journal.name} (${resolvedTheme.widthMm} mm) · ${resolvedTheme.palette.name} · ${activeStyle.fontFamily} · ${activeStyle.dpi} DPI`}
                 </p>
               </div>
 
@@ -1166,7 +1286,7 @@ export function App() {
 
             {/* Interactive Publication Figure Card */}
             <motion.div
-              key={`${studio}-${studio === 'plotter' ? deConfig.plotType : statsConfig.plotType}`}
+              key={`${studio}-${studio === 'plotter' ? deConfig.plotType : studio === 'gallery' ? activeCase.id : statsConfig.plotType}`}
               initial={{ opacity: 0.72, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={APPLE_SPRINGS.criticallyDamped}
@@ -1181,7 +1301,14 @@ export function App() {
                   : undefined
               }
             >
-              {studio === 'plotter' ? (
+              {studio === 'gallery' ? (
+                <JournalCaseRenderer
+                  item={activeCase}
+                  styleSettings={deConfig}
+                  darkMode={darkMode}
+                  svgRef={svgRef}
+                />
+              ) : studio === 'plotter' ? (
                 <>
                   {(deConfig.plotType === 'volcano' || deConfig.plotType === 'ma') && (
                     <VolcanoMAPlot
@@ -1232,19 +1359,74 @@ export function App() {
               )}
             </motion.div>
 
-            {/* Studio 2 Statistical Advisor Decision Engine Panel */}
+            {/* Studio 2 Statistical Advisor + Layman Plain-English Guide */}
             {studio === 'stats' && (
-              <StatAdvisorPanel
-                analysis={statsAnalysis}
-                collapsePseudoreplicates={statsConfig.collapsePseudoreplicates}
-                onToggleCollapseReplicates={() => {
-                  setStatsConfig((p) => ({
-                    ...p,
-                    collapsePseudoreplicates: !p.collapsePseudoreplicates,
-                  }));
-                  playAppleTick(soundEnabled, 'commit');
-                }}
-              />
+              <>
+                <StatAdvisorPanel
+                  analysis={statsAnalysis}
+                  collapsePseudoreplicates={statsConfig.collapsePseudoreplicates}
+                  onToggleCollapseReplicates={() => {
+                    setStatsConfig((p) => ({
+                      ...p,
+                      collapsePseudoreplicates: !p.collapsePseudoreplicates,
+                    }));
+                    playAppleTick(soundEnabled, 'commit');
+                  }}
+                />
+                <LaymanStatsGuide analysis={statsAnalysis} soundEnabled={soundEnabled} />
+              </>
+            )}
+
+            {/* 20 Journal Figures Guide & Attribution Strip */}
+            {studio === 'gallery' && (
+              <div className="material-card rounded-2xl p-5 space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+                      {activeCase.category} · Based on {activeCase.journalSource}
+                    </div>
+                    <h3 className="type-title text-base font-bold text-[var(--text-primary)] mt-0.5">
+                      When to Use This Figure &amp; How to Read It
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onPointerDown={() => {
+                      setCodeSheetOpen(true);
+                      playAppleTick(soundEnabled, 'select');
+                    }}
+                    className="apple-press px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-[var(--accent)] text-white"
+                  >
+                    Get ggplot2 R / Python Code →
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  <div className="rounded-xl p-3 bg-[var(--bg-subtle)] border border-[var(--border-hairline)]">
+                    <div className="font-semibold text-[var(--text-primary)] mb-1">Best Biological Use Case</div>
+                    <p className="text-[var(--text-secondary)] leading-relaxed">{activeCase.bestFor}</p>
+                  </div>
+                  <div className="rounded-xl p-3 bg-[var(--bg-subtle)] border border-[var(--border-hairline)]">
+                    <div className="font-semibold text-[var(--text-primary)] mb-1">Plain-English Reading Guide</div>
+                    <p className="text-[var(--text-secondary)] leading-relaxed">{activeCase.plainEnglishTip}</p>
+                  </div>
+                </div>
+                <div className="text-[11px] text-[var(--text-tertiary)] flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <span>
+                    R packages: <code className="font-mono">{activeCase.rPackages.join(', ')}</code>
+                  </span>
+                  <span>
+                    Inspired by MIT open-source{' '}
+                    <a
+                      href="https://github.com/GeneticistHere/ggplot2-20-journal-cases"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline hover:text-[var(--accent)]"
+                    >
+                      GeneticistHere/ggplot2-20-journal-cases
+                    </a>
+                  </span>
+                </div>
+              </div>
             )}
 
             {/* Studio 1 Inline Reproducibility Strip */}

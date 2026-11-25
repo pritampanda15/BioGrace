@@ -1,4 +1,4 @@
-export type StudioMode = 'plotter' | 'stats';
+export type StudioMode = 'plotter' | 'gallery' | 'stats';
 
 export type DEPlotType = 'volcano' | 'ma' | 'dotplot' | 'upset' | 'lollipop';
 

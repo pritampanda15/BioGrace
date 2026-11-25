@@ -39,8 +39,17 @@ Stop fighting `ggplot2` and `matplotlib` layouts for hours after finishing `DESe
 - **12 Continuous Colormaps (for scRNA Dot Plots & continuous scales):** `RdYlBu_r`, `viridis`, `plasma`, `inferno`, `magma`, `cividis`, `coolwarm`, `Spectral_r`, `turbo`, `Blues`, `YlGnBu`, and `cubehelix_r`.
 - **Typography & Export Controls:** `Sans-Serif (Helvetica/Arial)`, `Serif (Times New Roman/Georgia)`, `Monospace`, custom font size (`pt`), stroke line width (`pt`), Single / 1.5 / Double column widths (`mm`), Transparent Background, and `300 / 600 / 1200 DPI` PNG plus vector **SVG** & **PDF** (`svg2pdf.js`).
 
-### 2. Biologist's Statistical Test Advisor & Anti-Barplot Studio
-Stop choosing inappropriate statistical tests or hiding distributions behind dynamite bar charts + SEM:
+### 2. 20 Open-Source Top-Journal Figure Archetypes
+Interactive vector SVG gallery inspired by the MIT-licensed [`GeneticistHere/ggplot2-20-journal-cases`](https://github.com/GeneticistHere/ggplot2-20-journal-cases) collection (*Nature*, *Nature Microbiology*, *Nature Cell Biology*, *Nature Communications*, *iMeta*, *IJMS*):
+- **Distribution & Stats:** Individualized Error Dot-Plot (`01`), Grouped Error Dot-Plot (`02`), Paired Boxplot (`05`), Horizontal Raincloud (`06`), Variance Bars with CLD Letters (`09`), Split Violin (`20`).
+- **Genomics & Clinical:** Multi-Group Volcano (`03`), Manhattan GWAS/TWAS (`04`), Clinical Cohort Swimmer Plot (`07`), Importance Bars + Abundance Streams (`08`).
+- **Networks & Flows:** Circos Fusion-Gene Diagram (`10`), Module Interaction Network (`11`), Sankey + Enrichment Bubble Panel (`12`), Multi-Level Alluvial Flow (`17`).
+- **Heatmaps & Composition:** Discrete Binned Heatmap (`13`), Mantel Composite Correlation Heatmap (`14`), Multi-Group Correlation Heatmap (`15`), Polar-Coordinate Circular Heatmap (`16`), Hierarchical Pathway Treemap (`18`), Mosaic & Sunburst Ring (`19`).
+- Every figure responds live to all 7 journal presets, 7 color palettes, 12 colormaps, fonts, and stroke widths, with vector SVG/PDF export and reproducible `ggplot2` R & Python starter code.
+
+### 3. Biologist's Statistical Test Advisor, Anti-Barplot Studio & Plain-English Coach
+Stop choosing inappropriate statistical tests, hiding distributions behind dynamite bar charts + SEM, or decoding opaque statistical jargon:
+- **Plain-English Biology Translator:** Explains your exact result in everyday language (what the $p$-value means about luck, whether the effect size is practically small/medium/large, a visual 4-step **Decision Path Flowchart**, a one-click **Ready-to-Paste Methods & Figure Legend Paragraph**, and a 7-concept **Biologist's Pocket Guide to Statistics**).
 - **Automated assumption & study-design engine** (pure client-side TypeScript):
   - **Normality check:** Shapiro–Wilk test (Royston approximation) and skewness per group.
   - **Variance check:** Brown–Forsythe median-centered Levene's test.
