@@ -1,6 +1,21 @@
 export type StudioMode = 'plotter' | 'gallery' | 'stats';
 
-export type DEPlotType = 'volcano' | 'ma' | 'dotplot' | 'upset' | 'lollipop';
+export type DEPlotType =
+  | 'volcano'
+  | 'ma'
+  | 'dotplot'
+  | 'upset'
+  | 'lollipop'
+  | 'umap'
+  | 'tsne'
+  | 'pca'
+  | 'heatmap'
+  | 'pseudotime'
+  | 'dose-response'
+  | 'survival'
+  | 'forest'
+  | 'roc'
+  | 'correlation';
 
 export type StatsPlotType = 'raincloud' | 'box-beeswarm' | 'paired-slope' | 'barplot-trap';
 

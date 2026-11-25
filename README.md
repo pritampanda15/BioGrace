@@ -21,12 +21,11 @@ BioGrace eliminates two daily bottlenecks between wet-lab and dry-lab biology in
 ### 1. DE & Single-Cell Publication Plotter
 Stop fighting `ggplot2` and `matplotlib` layouts for hours after finishing `DESeq2`, `edgeR`, `limma`, `Scanpy`, or `Seurat`:
 - **Drag-and-drop CSV/TSV** with automatic tool & column detection (`DESeq2`, `edgeR`, `limma`, `Scanpy`, `Seurat`, `fgsea`, binary UpSet tables).
-- **Five publication chart types:**
-  - **Volcano Plot** — animated `|log2FC|` & FDR threshold planes, click any point to pin/unpin a gene label, and **1:1 direct pointer drag** on gene callouts to eliminate label overlap.
-  - **MA Plot** — `log10(baseMean)` vs `log2FoldChange` with interactive gene pinning.
-  - **Single-Cell Marker Dot Plot** — dot size = `% expressed`, perceptual ramp = mean expression, self-contained vector colorbar & size legend.
-  - **DEG UpSet Plot** — multi-contrast intersection bars, connection matrix, set-size bars, and clickable overlapping gene lists.
-  - **Ranked Pathway Lollipop Chart** — diverging NES lollipops sized by gene count.
+- **Fifteen interactive publication chart types (organized into DE/Bulk, Single-Cell, and Assays & Clinical):**
+  - **DE & Bulk:** Volcano Plot, MA Plot, PCA with 95% Confidence Ellipses, Z-Scored DEG Expression Heatmap, DEG UpSet Plot, Ranked Pathway Lollipop.
+  - **Single-Cell:** Interactive **scRNA UMAP & t-SNE** (with FeaturePlot gene overlays, corner-arrow axes, draggable cluster centroids, and Split-by-Condition view), scRNA Marker Dot Plot, Differentiation Pseudotime Ribbon.
+  - **Wet-Lab & Clinical Assays:** **4PL Dose–Response / IC₅₀ Curve Fitter**, **Kaplan–Meier Survival + Log-Rank Test + Number-at-Risk Table**, **Forest Plot (HR/OR)**, **Multi-Biomarker ROC & AUROC Curves (Youden J)**, and **Method Correlation (Pearson/Spearman) + Bland–Altman Agreement**.
+- **Plain-English Statistical Explainer:** Every analytical plot includes a layman-friendly biology card explaining what you are looking at, what the live statistics mean (IC₅₀, Hill slope, Log-Rank $p$, AUROC, PC1/PC2%, Bland–Altman bias), common pitfalls to avoid, and a one-click copyable Methods/Legend paragraph.
 - **6 Scientific Journal Presets:**
   - **Nature Portfolio** (`89 / 120 / 183 mm`, open frame, outward ticks)
   - **Science (AAAS)** (`75 / 120 / 175 mm`, open frame, outward ticks)

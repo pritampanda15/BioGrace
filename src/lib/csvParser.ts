@@ -6,6 +6,8 @@ import type {
   UpSetItem,
   VolcanoRow,
 } from '../types/biograce';
+import type { DosePoint, PairXYRow, ROCInputRow, SurvivalRow } from './bioAnalytics';
+import type { EmbeddingCell, ForestRow, PCASampleRow } from './advancedDemoData';
 
 export interface ParsedTable {
   headers: string[];
@@ -202,4 +204,135 @@ export function parseTidyStatsTable(table: ParsedTable): {
   }
 
   return { rows: parsed, groupCol, valueCol, subjectCol, replicateCol };
+}
+
+/** Parse Seurat / Scanpy UMAP or t-SNE CSV (UMAP_1, UMAP_2, cluster, optional condition & gene columns) */
+export function parseEmbeddingRows(table: ParsedTable): { cells: EmbeddingCell[]; markers: string[] } {
+  const { headers, rows } = table;
+  const u1 = findColumn(headers, ['umap_1', 'umap1', 'x', 'tsne_1', 'tsne1']) ?? headers[0];
+  const u2 = findColumn(headers, ['umap_2', 'umap2', 'y', 'tsne_2', 'tsne2']) ?? headers[1];
+  const t1 = findColumn(headers, ['tsne_1', 'tsne1']) ?? u1;
+  const t2 = findColumn(headers, ['tsne_2', 'tsne2']) ?? u2;
+  const clCol = findColumn(headers, ['cluster', 'cell_type', 'celltype', 'leiden', 'seurat_clusters', 'group']) ?? headers[2];
+  const condCol = findColumn(headers, ['condition', 'treatment', 'stim', 'sample', 'batch']);
+  const idCol = findColumn(headers, ['cell', 'barcode', 'id']);
+  const reserved = new Set([u1, u2, t1, t2, clCol, condCol, idCol].filter(Boolean));
+  const markers = headers.filter((h) => !reserved.has(h) && Number.isFinite(Number(rows[0]?.[h]))).slice(0, 8);
+
+  const cells: EmbeddingCell[] = [];
+  rows.forEach((r, i) => {
+    const xU = Number(r[u1]);
+    const yU = Number(r[u2]);
+    const xT = Number(r[t1]);
+    const yT = Number(r[t2]);
+    if (!Number.isFinite(xU) || !Number.isFinite(yU)) return;
+    const expr: Record<string, number> = {};
+    for (const m of markers) {
+      const v = Number(r[m]);
+      expr[m] = Number.isFinite(v) ? v : 0;
+    }
+    const rawCond = condCol ? (r[condCol] ?? '').toLowerCase() : '';
+    cells.push({
+      id: idCol ? r[idCol] : `Cell_${i + 1}`,
+      cluster: (r[clCol] ?? 'Cluster 1').trim(),
+      condition: rawCond.includes('treat') || rawCond.includes('stim') || rawCond.includes('ko') ? 'Treated' : 'Control',
+      umap1: xU,
+      umap2: yU,
+      tsne1: Number.isFinite(xT) ? xT : xU,
+      tsne2: Number.isFinite(yT) ? yT : yU,
+      expr,
+    });
+  });
+  return { cells, markers };
+}
+
+export function parsePCARows(table: ParsedTable): PCASampleRow[] {
+  const { headers, rows } = table;
+  const pc1Col = findColumn(headers, ['pc1', 'pc_1', 'dim1', 'x']) ?? headers[1];
+  const pc2Col = findColumn(headers, ['pc2', 'pc_2', 'dim2', 'y']) ?? headers[2];
+  const groupCol = findColumn(headers, ['group', 'condition', 'treatment', 'cluster', 'cohort']) ?? headers[0];
+  const sampleCol = findColumn(headers, ['sample', 'id', 'name']) ?? headers[0];
+  return rows
+    .map((r, i) => ({
+      sample: (r[sampleCol] ?? `S${i + 1}`).trim(),
+      group: (r[groupCol] ?? 'Group 1').trim(),
+      pc1: Number(r[pc1Col]),
+      pc2: Number(r[pc2Col]),
+    }))
+    .filter((r) => Number.isFinite(r.pc1) && Number.isFinite(r.pc2));
+}
+
+export function parseDoseResponseRows(table: ParsedTable): DosePoint[] {
+  const { headers, rows } = table;
+  const concCol = findColumn(headers, ['conc', 'concentration', 'dose', 'um', 'nm', 'x']) ?? headers[0];
+  const respCol = findColumn(headers, ['response', 'viability', 'inhibition', 'activity', 'value', 'y']) ?? headers[1];
+  const compCol = findColumn(headers, ['compound', 'drug', 'group', 'treatment', 'arm']);
+  return rows
+    .map((r) => ({
+      compound: compCol ? (r[compCol] ?? 'Compound').trim() : 'Compound',
+      conc: Number(r[concCol]),
+      response: Number(r[respCol]),
+    }))
+    .filter((r) => r.conc > 0 && Number.isFinite(r.response));
+}
+
+export function parseSurvivalRows(table: ParsedTable): SurvivalRow[] {
+  const { headers, rows } = table;
+  const timeCol = findColumn(headers, ['time', 'months', 'days', 'os_time', 'pfs', 'duration']) ?? headers[0];
+  const eventCol = findColumn(headers, ['event', 'status', 'death', 'os_event', 'censored']) ?? headers[1];
+  const groupCol = findColumn(headers, ['group', 'arm', 'treatment', 'cohort', 'strata']) ?? headers[2];
+  return rows
+    .map((r) => ({
+      group: (r[groupCol] ?? 'Arm 1').trim(),
+      time: Number(r[timeCol]),
+      event: (Number(r[eventCol]) >= 1 ? 1 : 0) as 0 | 1,
+    }))
+    .filter((r) => Number.isFinite(r.time) && r.time >= 0);
+}
+
+export function parseForestRows(table: ParsedTable): ForestRow[] {
+  const { headers, rows } = table;
+  const varCol = findColumn(headers, ['variable', 'term', 'feature', 'study', 'name']) ?? headers[0];
+  const hrCol = findColumn(headers, ['hr', 'or', 'estimate', 'ratio', 'effect']) ?? headers[1];
+  const loCol = findColumn(headers, ['ci_low', 'cilow', 'lower', 'low', 'lcl']) ?? headers[2];
+  const hiCol = findColumn(headers, ['ci_high', 'cihigh', 'upper', 'high', 'ucl']) ?? headers[3];
+  const pCol = findColumn(headers, ['pvalue', 'p_value', 'p', 'pval']);
+  return rows
+    .map((r) => ({
+      variable: (r[varCol] ?? '').trim(),
+      hr: Number(r[hrCol]),
+      ciLow: Number(r[loCol]),
+      ciHigh: Number(r[hiCol]),
+      pValue: pCol ? Number(r[pCol]) : 0.05,
+    }))
+    .filter((r) => r.variable && r.hr > 0 && r.ciLow > 0 && r.ciHigh > 0);
+}
+
+export function parseROCRows(table: ParsedTable): ROCInputRow[] {
+  const { headers, rows } = table;
+  const lblCol = findColumn(headers, ['label', 'truth', 'y', 'class', 'outcome', 'status']) ?? headers[0];
+  const scoreCol = findColumn(headers, ['score', 'prob', 'prediction', 'biomarker', 'value']) ?? headers[1];
+  const modCol = findColumn(headers, ['model', 'biomarker_name', 'group', 'signature']);
+  return rows
+    .map((r) => ({
+      model: modCol ? (r[modCol] ?? 'Model').trim() : 'Biomarker',
+      label: (Number(r[lblCol]) >= 1 ? 1 : 0) as 0 | 1,
+      score: Number(r[scoreCol]),
+    }))
+    .filter((r) => Number.isFinite(r.score));
+}
+
+export function parsePairXYRows(table: ParsedTable): PairXYRow[] {
+  const { headers, rows } = table;
+  const numericCols = headers.filter((h) => Number.isFinite(Number(rows[0]?.[h])));
+  const xCol = numericCols[0] ?? headers[0];
+  const yCol = numericCols[1] ?? headers[1];
+  const idCol = headers.find((h) => h !== xCol && h !== yCol);
+  return rows
+    .map((r, i) => ({
+      id: idCol ? (r[idCol] ?? `S${i + 1}`) : `S${i + 1}`,
+      x: Number(r[xCol]),
+      y: Number(r[yCol]),
+    }))
+    .filter((r) => Number.isFinite(r.x) && Number.isFinite(r.y));
 }

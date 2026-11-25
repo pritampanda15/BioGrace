@@ -170,6 +170,113 @@ ggsave("biograce_upset.pdf", p, width = ${wMm}, height = ${hMm}, units = "mm", d
 `;
   }
 
+  if (config.plotType === 'umap' || config.plotType === 'tsne') {
+    const dim = config.plotType === 'umap' ? 'UMAP' : 'tSNE';
+    return `# BioGrace Single-Cell ${dim} Plot (${t.journal.name} · ${t.palette.name})
+library(ggplot2)
+library(dplyr)
+library(readr)
+
+df <- read_csv("${inputFile}", show_col_types = FALSE)
+pal <- c(${t.palette.colors.slice(0, 6).map((c) => `"${c}"`).join(', ')})
+
+p <- ggplot(df, aes(x = ${dim}_1, y = ${dim}_2, color = cluster)) +
+  geom_point(size = 1.2, alpha = 0.85) +
+  scale_color_manual(values = pal) +
+  labs(title = "${config.title}", x = "${dim} 1", y = "${dim} 2", color = "Cell Type") +
+  theme_void(base_size = ${config.fontSizePt.toFixed(1)}, base_family = "${rFont}")
+
+ggsave("biograce_${config.plotType}.pdf", p, width = ${wMm}, height = ${hMm}, units = "mm", device = cairo_pdf)
+`;
+  }
+
+  if (config.plotType === 'pca') {
+    return `# BioGrace PCA with 95% Confidence Ellipses (${t.journal.name})
+library(ggplot2)
+library(readr)
+
+df <- read_csv("${inputFile}", show_col_types = FALSE)
+pal <- c(${t.palette.colors.slice(0, 6).map((c) => `"${c}"`).join(', ')})
+
+p <- ggplot(df, aes(PC1, PC2, color = group, fill = group)) +
+  stat_ellipse(geom = "polygon", level = 0.95, alpha = 0.14, linetype = "dashed") +
+  geom_point(size = 3.2) +
+  scale_color_manual(values = pal) + scale_fill_manual(values = pal) +
+  labs(title = "${config.title}", x = "${config.xLabel || 'PC1 (% variance)'}", y = "${config.yLabel || 'PC2 (% variance)'}") +
+  ${rBaseTheme}(base_size = ${config.fontSizePt.toFixed(1)}, base_family = "${rFont}")
+
+ggsave("biograce_pca.pdf", p, width = ${wMm}, height = ${hMm}, units = "mm", device = cairo_pdf)
+`;
+  }
+
+  if (config.plotType === 'dose-response') {
+    return `# BioGrace 4PL Dose-Response / IC50 Fitter (${t.journal.name})
+# Install once: install.packages(c("drc", "ggplot2", "readr"))
+library(drc)
+library(ggplot2)
+library(readr)
+
+df <- read_csv("${inputFile}", show_col_types = FALSE)
+fit <- drm(response ~ conc, curveid = compound, data = df, fct = LL.4())
+summary(fit)
+ED(fit, 50, interval = "delta") # IC50 + 95% CI
+
+p <- ggplot(df, aes(x = conc, y = response, color = compound)) +
+  geom_point(size = 2.4, alpha = 0.75) +
+  geom_smooth(method = drm, method.args = list(fct = LL.4()), se = FALSE, linewidth = 1.1) +
+  scale_x_log10() +
+  geom_hline(yintercept = 50, linetype = "dashed", color = "#64748b") +
+  scale_color_manual(values = c(${t.palette.colors.slice(0, 4).map((c) => `"${c}"`).join(', ')})) +
+  labs(title = "${config.title}", x = "${config.xLabel || 'Concentration (µM)'}", y = "${config.yLabel || 'Cell Viability (%)'}") +
+  ${rBaseTheme}(base_size = ${config.fontSizePt.toFixed(1)}, base_family = "${rFont}")
+
+ggsave("biograce_dose_response.pdf", p, width = ${wMm}, height = ${hMm}, units = "mm", device = cairo_pdf)
+`;
+  }
+
+  if (config.plotType === 'survival') {
+    return `# BioGrace Kaplan-Meier Survival + Log-Rank Test + Risk Table (${t.journal.name})
+# Install once: install.packages(c("survival", "survminer", "readr"))
+library(survival)
+library(survminer)
+library(readr)
+
+df <- read_csv("${inputFile}", show_col_types = FALSE)
+fit <- survfit(Surv(time, event) ~ group, data = df)
+survdiff(Surv(time, event) ~ group, data = df) # Mantel-Cox Log-Rank Test
+
+p <- ggsurvplot(
+  fit, data = df,
+  pval = TRUE, conf.int = TRUE, risk.table = TRUE,
+  palette = c(${t.palette.colors.slice(0, 4).map((c) => `"${c}"`).join(', ')}),
+  ggtheme = ${rBaseTheme}(base_size = ${config.fontSizePt.toFixed(1)}, base_family = "${rFont}"),
+  title = "${config.title}", xlab = "${config.xLabel || 'Time (Months)'}", ylab = "${config.yLabel || 'Survival Probability'}"
+)
+print(p)
+`;
+  }
+
+  if (config.plotType === 'forest' || config.plotType === 'roc' || config.plotType === 'correlation' || config.plotType === 'heatmap' || config.plotType === 'pseudotime') {
+    return `# BioGrace Reproducible R Script (${config.plotType} · ${t.journal.name})
+library(ggplot2)
+library(readr)
+
+df <- read_csv("${inputFile}", show_col_types = FALSE)
+pal <- c(${t.palette.colors.slice(0, 6).map((c) => `"${c}"`).join(', ')})
+${
+  config.plotType === 'roc'
+    ? `library(pROC)\nroc_obj <- roc(df$label, df$score)\nauc(roc_obj); ci.auc(roc_obj)\nggroc(roc_obj, colour = pal[1], linewidth = 1.1) + geom_abline(slope = 1, intercept = 1, linetype = "dashed") + ${rBaseTheme}(base_family = "${rFont}")`
+    : config.plotType === 'forest'
+    ? `p <- ggplot(df, aes(x = hr, y = reorder(variable, hr), xmin = ci_low, xmax = ci_high)) +\n  geom_vline(xintercept = 1, linetype = "dashed") +\n  geom_errorbarh(height = 0.2) + geom_point(size = 3, color = pal[1]) +\n  scale_x_log10() + labs(title = "${config.title}", x = "Hazard Ratio (95% CI)", y = NULL) + ${rBaseTheme}(base_family = "${rFont}")`
+    : config.plotType === 'correlation'
+    ? `cor.test(df$x, df$y, method = "pearson")\ncor.test(df$x, df$y, method = "spearman")\np <- ggplot(df, aes(x, y)) + geom_point(color = pal[1], size = 2.6) + geom_smooth(method = "lm", color = pal[1]) + labs(title = "${config.title}") + ${rBaseTheme}(base_family = "${rFont}")`
+    : config.plotType === 'heatmap'
+    ? `# Row z-scored heatmap\nlibrary(pheatmap)\nmat <- as.matrix(df[, -1]); rownames(mat) <- df[[1]]\npheatmap(mat, scale = "row", color = colorRampPalette(c(${t.colormap.stops.map((c) => `"${c}"`).join(', ')}))(100), main = "${config.title}")`
+    : `p <- ggplot(df, aes(pseudotime, expression, color = gene, fill = gene)) + geom_smooth(method = "gam") + scale_color_manual(values = pal) + scale_fill_manual(values = pal) + labs(title = "${config.title}") + ${rBaseTheme}(base_family = "${rFont}")`
+}
+`;
+  }
+
   return `# BioGrace Ranked Pathway Lollipop Chart (${t.journal.name} · ${t.palette.name})
 library(ggplot2)
 library(dplyr)
@@ -250,6 +357,72 @@ ax.set_title("${config.title}", loc="left", fontweight="bold", pad=10)
 ax.set_xlabel("${isVolcano ? 'log2 Fold Change' : 'log10 Mean Expression (baseMean)'}")
 ax.set_ylabel("${isVolcano ? '-log10 Adjusted P-value (FDR)' : 'log2 Fold Change'}")
 ax.legend(frameon=False, ncol=3, loc="upper right")
+fig.tight_layout()
+fig.savefig("biograce_${config.plotType}.svg", ${saveArgs})
+fig.savefig("biograce_${config.plotType}.pdf", ${saveArgs})
+`;
+  }
+
+  if (['umap', 'tsne', 'pca', 'dose-response', 'survival', 'forest', 'roc', 'correlation', 'heatmap', 'pseudotime'].includes(config.plotType)) {
+    return `# BioGrace Reproducible Python Script (${config.plotType} · ${t.journal.name})
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+${rcBlock}
+
+df = pd.read_csv("${inputFile}")
+pal = [${t.palette.colors.slice(0, 6).map((c) => `"${c}"`).join(', ')}]
+fig, ax = plt.subplots(figsize=FIGSIZE, dpi=${t.dpi})
+${
+  config.plotType === 'umap' || config.plotType === 'tsne'
+    ? `sns.scatterplot(data=df, x="${config.plotType === 'umap' ? 'UMAP_1' : 'tSNE_1'}", y="${config.plotType === 'umap' ? 'UMAP_2' : 'tSNE_2'}", hue="cluster", palette=pal, s=14, linewidths=0, ax=ax)`
+    : config.plotType === 'pca'
+    ? `sns.scatterplot(data=df, x="PC1", y="PC2", hue="group", palette=pal, s=48, ax=ax)`
+    : config.plotType === 'dose-response'
+    ? `from scipy.optimize import curve_fit
+def hill4pl(x, bottom, top, ic50, hill):
+    return bottom + (top - bottom) / (1.0 + (x / ic50) ** hill)
+for i, (comp, sub) in enumerate(df.groupby("compound")):
+    popt, _ = curve_fit(hill4pl, sub["conc"], sub["response"], p0=[5, 100, np.median(sub["conc"]), 1.0], maxfev=10000)
+    print(f"{comp}: IC50={popt[2]:.4g}, Hill={popt[3]:.2f}")
+    xs = np.logspace(np.log10(sub["conc"].min()), np.log10(sub["conc"].max()), 200)
+    ax.scatter(sub["conc"], sub["response"], color=pal[i], alpha=0.75)
+    ax.plot(xs, hill4pl(xs, *popt), color=pal[i], label=f"{comp} (IC50={popt[2]:.3g})")
+ax.set_xscale("log"); ax.axhline(50, ls="--", color="#64748b"); ax.legend(frameon=False)`
+    : config.plotType === 'survival'
+    ? `# pip install lifelines
+from lifelines import KaplanMeierFitter
+from lifelines.statistics import logrank_test
+kmf = KaplanMeierFitter()
+for i, (grp, sub) in enumerate(df.groupby("group")):
+    kmf.fit(sub["time"], event_observed=sub["event"], label=grp)
+    kmf.plot_survival_function(ax=ax, color=pal[i], ci_show=True)`
+    : config.plotType === 'roc'
+    ? `from sklearn.metrics import roc_curve, roc_auc_score
+for i, (mod, sub) in enumerate(df.groupby("model")):
+    fpr, tpr, _ = roc_curve(sub["label"], sub["score"])
+    auc = roc_auc_score(sub["label"], sub["score"])
+    ax.plot(fpr, tpr, color=pal[i], label=f"{mod} (AUC={auc:.3f})")
+ax.plot([0, 1], [0, 1], ls="--", color="#94a3b8"); ax.legend(frameon=False)`
+    : config.plotType === 'correlation'
+    ? `from scipy import stats
+r, p = stats.pearsonr(df["x"], df["y"])
+rho, _ = stats.spearmanr(df["x"], df["y"])
+print(f"Pearson r={r:.3f} (p={p:.3g}), Spearman rho={rho:.3f}")
+sns.regplot(data=df, x="x", y="y", color=pal[0], ax=ax)`
+    : config.plotType === 'forest'
+    ? `ax.axvline(1.0, ls="--", color="#334155")
+ax.errorbar(df["hr"], range(len(df)), xerr=[df["hr"]-df["ci_low"], df["ci_high"]-df["hr"]], fmt="s", color=pal[0])
+ax.set_xscale("log"); ax.set_yticks(range(len(df))); ax.set_yticklabels(df["variable"])`
+    : config.plotType === 'heatmap'
+    ? `mat = df.set_index(df.columns[0])
+z = mat.sub(mat.mean(axis=1), axis=0).div(mat.std(axis=1), axis=0)
+sns.heatmap(z, cmap="${t.colormap.id}", center=0, ax=ax)`
+    : `sns.lineplot(data=df, x="pseudotime", y="expression", hue="gene", palette=pal, ax=ax)`
+}
+ax.set_title("${config.title}", loc="left", fontweight="bold")
 fig.tight_layout()
 fig.savefig("biograce_${config.plotType}.svg", ${saveArgs})
 fig.savefig("biograce_${config.plotType}.pdf", ${saveArgs})

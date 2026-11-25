@@ -63,11 +63,34 @@ import {
 import {
   parseDERows,
   parseDelimitedText,
+  parseDoseResponseRows,
   parseDotPlotRows,
+  parseEmbeddingRows,
+  parseForestRows,
+  parsePairXYRows,
   parsePathwayRows,
+  parsePCARows,
+  parseROCRows,
+  parseSurvivalRows,
   parseTidyStatsTable,
   parseUpSetRows,
 } from './lib/csvParser';
+import {
+  EMBEDDING_MARKERS,
+  generateDemoCorrelationData,
+  generateDemoDEGHeatmap,
+  generateDemoDoseResponse,
+  generateDemoEmbeddingData,
+  generateDemoForestData,
+  generateDemoPCAData,
+  generateDemoPseudotime,
+  generateDemoROCData,
+  generateDemoSurvivalData,
+  type EmbeddingCell,
+  type ForestRow,
+  type PCASampleRow,
+} from './lib/advancedDemoData';
+import type { DosePoint, PairXYRow, ROCInputRow, SurvivalRow } from './lib/bioAnalytics';
 import { analyzeTidyDataset } from './lib/statsEngine';
 import {
   generateDECliCommand,
@@ -95,9 +118,19 @@ import { VolcanoMAPlot } from './components/plots/VolcanoMAPlot';
 import { DotPlotChart } from './components/plots/DotPlotChart';
 import { UpSetPlot } from './components/plots/UpSetPlot';
 import { PathwayLollipopPlot } from './components/plots/PathwayLollipopPlot';
+import { EmbeddingPlot } from './components/plots/EmbeddingPlot';
+import { PCAPlot } from './components/plots/PCAPlot';
+import { DEGHeatmapPlot } from './components/plots/DEGHeatmapPlot';
+import { PseudotimePlot } from './components/plots/PseudotimePlot';
+import { DoseResponsePlot } from './components/plots/DoseResponsePlot';
+import { SurvivalKMPlot } from './components/plots/SurvivalKMPlot';
+import { ForestPlotChart } from './components/plots/ForestPlotChart';
+import { ROCPlotChart } from './components/plots/ROCPlotChart';
+import { CorrelationBlandAltmanPlot } from './components/plots/CorrelationBlandAltmanPlot';
 import { AntiBarplotCanvas } from './components/plots/AntiBarplotCanvas';
 import { StatAdvisorPanel } from './components/stats/StatAdvisorPanel';
 import { LaymanStatsGuide } from './components/stats/LaymanStatsGuide';
+import { PlotLaymanExplainer } from './components/stats/PlotLaymanExplainer';
 import { JournalCaseRenderer } from './components/plots/JournalCaseRenderer';
 import {
   JOURNAL_CASES_20,
@@ -137,6 +170,22 @@ export function App() {
   const [dotPlotRows, setDotPlotRows] = useState<DotPlotRow[]>(() => generateDemoDotPlotData());
   const [upsetItems, setUpsetItems] = useState<UpSetItem[]>(() => generateDemoUpSetData());
   const [pathwayRows, setPathwayRows] = useState<PathwayRow[]>(() => generateDemoPathwayData());
+  const [embeddingCells, setEmbeddingCells] = useState<EmbeddingCell[]>(() => generateDemoEmbeddingData());
+  const [embeddingMarkers, setEmbeddingMarkers] = useState<string[]>([...EMBEDDING_MARKERS]);
+  const [embeddingColorBy, setEmbeddingColorBy] = useState<'cluster' | string>('cluster');
+  const [embeddingSplit, setEmbeddingSplit] = useState(false);
+  const [pcaData, setPcaData] = useState<{ rows: PCASampleRow[]; pc1Var: number; pc2Var: number }>(() =>
+    generateDemoPCAData()
+  );
+  const [degHeatmap] = useState(() => generateDemoDEGHeatmap());
+  const [pseudotime] = useState(() => generateDemoPseudotime());
+  const [dosePoints, setDosePoints] = useState<DosePoint[]>(() => generateDemoDoseResponse());
+  const [survivalRows, setSurvivalRows] = useState<SurvivalRow[]>(() => generateDemoSurvivalData());
+  const [forestRows, setForestRows] = useState<ForestRow[]>(() => generateDemoForestData());
+  const [rocRows, setRocRows] = useState<ROCInputRow[]>(() => generateDemoROCData());
+  const [corrRows, setCorrRows] = useState<PairXYRow[]>(() => generateDemoCorrelationData());
+  const [corrViewMode, setCorrViewMode] = useState<'correlation' | 'bland-altman'>('correlation');
+  const [plotGroupTab, setPlotGroupTab] = useState<'de' | 'sc' | 'clinical'>('de');
   const [deSourceFile, setDeSourceFile] = useState('ifng_macrophage_deseq2.csv');
 
   const [deConfig, setDeConfig] = useState<DEPlotConfig>({
@@ -386,6 +435,57 @@ export function App() {
         setPathwayRows(rows);
         setDeSourceFile(file.name);
         setUploadBanner(`Loaded ${rows.length} enriched pathways from ${file.name}.`);
+      }
+    } else if (deConfig.plotType === 'umap' || deConfig.plotType === 'tsne') {
+      const parsed = parseEmbeddingRows(table);
+      if (parsed.cells.length) {
+        setEmbeddingCells(parsed.cells);
+        if (parsed.markers.length) setEmbeddingMarkers(parsed.markers);
+        setEmbeddingColorBy('cluster');
+        setDeSourceFile(file.name);
+        setUploadBanner(`Loaded ${parsed.cells.length} single cells from ${file.name}.`);
+      }
+    } else if (deConfig.plotType === 'pca') {
+      const rows = parsePCARows(table);
+      if (rows.length) {
+        setPcaData((p) => ({ ...p, rows }));
+        setDeSourceFile(file.name);
+        setUploadBanner(`Loaded ${rows.length} PCA samples from ${file.name}.`);
+      }
+    } else if (deConfig.plotType === 'dose-response') {
+      const pts = parseDoseResponseRows(table);
+      if (pts.length) {
+        setDosePoints(pts);
+        setDeSourceFile(file.name);
+        setUploadBanner(`Fitted 4PL dose-response curve on ${pts.length} measurements from ${file.name}.`);
+      }
+    } else if (deConfig.plotType === 'survival') {
+      const rows = parseSurvivalRows(table);
+      if (rows.length) {
+        setSurvivalRows(rows);
+        setDeSourceFile(file.name);
+        setUploadBanner(`Computed Kaplan–Meier & Log-Rank test on ${rows.length} subjects from ${file.name}.`);
+      }
+    } else if (deConfig.plotType === 'forest') {
+      const rows = parseForestRows(table);
+      if (rows.length) {
+        setForestRows(rows);
+        setDeSourceFile(file.name);
+        setUploadBanner(`Loaded ${rows.length} hazard/odds ratios from ${file.name}.`);
+      }
+    } else if (deConfig.plotType === 'roc') {
+      const rows = parseROCRows(table);
+      if (rows.length) {
+        setRocRows(rows);
+        setDeSourceFile(file.name);
+        setUploadBanner(`Computed ROC/AUROC on ${rows.length} observations from ${file.name}.`);
+      }
+    } else if (deConfig.plotType === 'correlation') {
+      const rows = parsePairXYRows(table);
+      if (rows.length) {
+        setCorrRows(rows);
+        setDeSourceFile(file.name);
+        setUploadBanner(`Computed Pearson/Spearman & Bland–Altman on ${rows.length} pairs from ${file.name}.`);
       }
     } else {
       const parsed = parseDERows(table);
@@ -698,22 +798,51 @@ export function App() {
               </div>
             ) : studio === 'plotter' ? (
               <>
-                {/* Plot Type Selector */}
-                <div>
-                  <label className="type-label text-[11px] font-semibold uppercase text-[var(--text-tertiary)] block mb-2">
-                    Publication Plot Type
+                {/* Categorized Publication Plot Picker (15 Plots across DE/Bulk, Single-Cell, Clinical & Assays) */}
+                <div className="space-y-2.5">
+                  <label className="type-label text-[11px] font-semibold uppercase text-[var(--text-tertiary)] block">
+                    Publication Plot Type (15)
                   </label>
+                  <AppleSegmentedControl<'de' | 'sc' | 'clinical'>
+                    layoutId="plot-group-pill"
+                    size="sm"
+                    fullWidth
+                    soundEnabled={soundEnabled}
+                    value={plotGroupTab}
+                    onChange={setPlotGroupTab}
+                    options={[
+                      { value: 'de', label: 'DE & Bulk' },
+                      { value: 'sc', label: 'Single-Cell' },
+                      { value: 'clinical', label: 'Assays & Stats' },
+                    ]}
+                  />
                   <div className="grid grid-cols-2 gap-1.5">
-                    {(
-                      [
-                        { id: 'volcano', label: 'Volcano Plot' },
-                        { id: 'ma', label: 'MA Plot' },
-                        { id: 'dotplot', label: 'scRNA Dot Plot' },
-                        { id: 'upset', label: 'DEG UpSet' },
-                        { id: 'lollipop', label: 'Pathway Lollipop' },
-                      ] as { id: DEPlotType; label: string }[]
-                    ).map((item) => {
+                    {(plotGroupTab === 'de'
+                      ? ([
+                          { id: 'volcano', label: 'Volcano Plot', title: 'IFN-γ Stimulated Macrophages vs. Control' },
+                          { id: 'ma', label: 'MA Plot', title: 'Expression Abundance vs. Fold Change (MA)' },
+                          { id: 'pca', label: 'PCA + 95% Ellipses', title: 'Principal Component Analysis (PCA)' },
+                          { id: 'heatmap', label: 'Z-Score Heatmap', title: 'Z-Scored DEG Expression Heatmap' },
+                          { id: 'upset', label: 'DEG UpSet', title: 'Cytokine-Responsive DEG Intersections' },
+                          { id: 'lollipop', label: 'Pathway Lollipop', title: 'GSEA Hallmark Pathway Enrichment' },
+                        ] as { id: DEPlotType; label: string; title: string }[])
+                      : plotGroupTab === 'sc'
+                      ? ([
+                          { id: 'umap', label: 'scRNA UMAP', title: 'Single-Cell UMAP Clustering' },
+                          { id: 'tsne', label: 'scRNA t-SNE', title: 'Single-Cell t-SNE Clustering' },
+                          { id: 'dotplot', label: 'scRNA Dot Plot', title: 'PBMC Canonical Lineage Markers' },
+                          { id: 'pseudotime', label: 'Pseudotime Ribbon', title: 'Differentiation Pseudotime Gene Dynamics' },
+                        ] as { id: DEPlotType; label: string; title: string }[])
+                      : ([
+                          { id: 'dose-response', label: 'IC50 Dose–Response', title: 'Dose–Response Inhibition Curve (4PL Hill Fit)' },
+                          { id: 'survival', label: 'Kaplan–Meier Survival', title: 'Kaplan–Meier Overall Survival' },
+                          { id: 'forest', label: 'Forest Plot (HR)', title: 'Multivariate Cox Regression Forest Plot' },
+                          { id: 'roc', label: 'ROC & AUC Curves', title: 'Biomarker Diagnostic Performance (ROC Curve)' },
+                          { id: 'correlation', label: 'Corr / Bland–Altman', title: 'Method Validation Correlation (qPCR vs. RNA-seq)' },
+                        ] as { id: DEPlotType; label: string; title: string }[])
+                    ).map((item, idx, arr) => {
                       const active = deConfig.plotType === item.id;
+                      const spanFull = arr.length % 2 === 1 && idx === arr.length - 1;
                       return (
                         <button
                           key={item.id}
@@ -722,21 +851,15 @@ export function App() {
                             setDeConfig((p) => ({
                               ...p,
                               plotType: item.id,
-                              title:
-                                item.id === 'volcano'
-                                  ? 'IFN-γ Stimulated Macrophages vs. Control'
-                                  : item.id === 'ma'
-                                  ? 'Expression Abundance vs. Fold Change (MA)'
-                                  : item.id === 'dotplot'
-                                  ? 'PBMC Canonical Lineage Markers'
-                                  : item.id === 'upset'
-                                  ? 'Cytokine-Responsive DEG Intersections'
-                                  : 'GSEA Hallmark Pathway Enrichment',
+                              title: item.title,
+                              subtitle: '',
+                              xLabel: '',
+                              yLabel: '',
                             }));
                             playAppleTick(soundEnabled, 'select');
                           }}
-                          className={`apple-press px-3 py-2 rounded-xl text-xs font-medium text-left transition-colors border ${
-                            item.id === 'lollipop' ? 'col-span-2' : ''
+                          className={`apple-press px-2.5 py-2 rounded-xl text-xs font-medium text-left transition-colors border ${
+                            spanFull ? 'col-span-2' : ''
                           } ${
                             active
                               ? 'bg-[var(--accent)] text-white border-transparent shadow-sm'
@@ -749,6 +872,71 @@ export function App() {
                     })}
                   </div>
                 </div>
+
+                {/* Contextual Controls for UMAP / t-SNE (FeaturePlot Gene Overlay + Split by Condition) */}
+                {(deConfig.plotType === 'umap' || deConfig.plotType === 'tsne') && (
+                  <div className="space-y-3 pt-3 border-t border-[var(--border-hairline)]">
+                    <div>
+                      <label className="type-label text-[11px] font-semibold uppercase text-[var(--text-tertiary)] block mb-1.5">
+                        Color Cells By (FeaturePlot)
+                      </label>
+                      <select
+                        value={embeddingColorBy}
+                        onChange={(e) => setEmbeddingColorBy(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-xl text-xs bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--text-primary)]"
+                      >
+                        <option value="cluster">Cell Type Clusters</option>
+                        {embeddingMarkers.map((m) => (
+                          <option key={m} value={m}>
+                            Gene Expression: {m}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <label className="flex items-center justify-between text-xs cursor-pointer">
+                      <span className="font-medium text-[var(--text-primary)]">Split by Condition (Ctrl vs Tx)</span>
+                      <input
+                        type="checkbox"
+                        checked={embeddingSplit}
+                        onChange={(e) => setEmbeddingSplit(e.target.checked)}
+                        className="accent-[var(--accent)] w-4 h-4 rounded"
+                      />
+                    </label>
+                  </div>
+                )}
+
+                {/* Contextual Controls for Correlation / Bland-Altman Toggle */}
+                {deConfig.plotType === 'correlation' && (
+                  <div className="pt-3 border-t border-[var(--border-hairline)]">
+                    <label className="type-label text-[11px] font-semibold uppercase text-[var(--text-tertiary)] block mb-1.5">
+                      Agreement Analysis View
+                    </label>
+                    <AppleSegmentedControl<'correlation' | 'bland-altman'>
+                      layoutId="corr-ba-pill"
+                      size="sm"
+                      fullWidth
+                      soundEnabled={soundEnabled}
+                      value={corrViewMode}
+                      onChange={(m) => {
+                        setCorrViewMode(m);
+                        setDeConfig((p) => ({
+                          ...p,
+                          title:
+                            m === 'bland-altman'
+                              ? 'Bland–Altman Assay Agreement'
+                              : 'Method Validation Correlation (qPCR vs. RNA-seq)',
+                          subtitle: '',
+                          xLabel: '',
+                          yLabel: '',
+                        }));
+                      }}
+                      options={[
+                        { value: 'correlation', label: 'Pearson / Spearman' },
+                        { value: 'bland-altman', label: 'Bland–Altman' },
+                      ]}
+                    />
+                  </div>
+                )}
 
                 {/* Threshold Sliders (Volcano / MA) */}
                 {(deConfig.plotType === 'volcano' || deConfig.plotType === 'ma') && (
@@ -1476,6 +1664,96 @@ export function App() {
                       onEditField={handleOpenPlotEdit}
                     />
                   )}
+                  {(deConfig.plotType === 'umap' || deConfig.plotType === 'tsne') && (
+                    <EmbeddingPlot
+                      mode={deConfig.plotType}
+                      cells={embeddingCells}
+                      markers={embeddingMarkers}
+                      colorBy={embeddingColorBy}
+                      splitByCondition={embeddingSplit}
+                      config={deConfig}
+                      darkMode={darkMode}
+                      soundEnabled={soundEnabled}
+                      svgRef={svgRef}
+                      onEditField={handleOpenPlotEdit}
+                    />
+                  )}
+                  {deConfig.plotType === 'pca' && (
+                    <PCAPlot
+                      rows={pcaData.rows}
+                      pc1Var={pcaData.pc1Var}
+                      pc2Var={pcaData.pc2Var}
+                      config={deConfig}
+                      darkMode={darkMode}
+                      svgRef={svgRef}
+                      onEditField={handleOpenPlotEdit}
+                    />
+                  )}
+                  {deConfig.plotType === 'heatmap' && (
+                    <DEGHeatmapPlot
+                      data={degHeatmap}
+                      config={deConfig}
+                      darkMode={darkMode}
+                      svgRef={svgRef}
+                      onEditField={handleOpenPlotEdit}
+                    />
+                  )}
+                  {deConfig.plotType === 'pseudotime' && (
+                    <PseudotimePlot
+                      stages={pseudotime.stages}
+                      series={pseudotime.series}
+                      config={deConfig}
+                      darkMode={darkMode}
+                      svgRef={svgRef}
+                      onEditField={handleOpenPlotEdit}
+                    />
+                  )}
+                  {deConfig.plotType === 'dose-response' && (
+                    <DoseResponsePlot
+                      points={dosePoints}
+                      config={deConfig}
+                      darkMode={darkMode}
+                      svgRef={svgRef}
+                      onEditField={handleOpenPlotEdit}
+                    />
+                  )}
+                  {deConfig.plotType === 'survival' && (
+                    <SurvivalKMPlot
+                      rows={survivalRows}
+                      config={deConfig}
+                      darkMode={darkMode}
+                      svgRef={svgRef}
+                      onEditField={handleOpenPlotEdit}
+                    />
+                  )}
+                  {deConfig.plotType === 'forest' && (
+                    <ForestPlotChart
+                      rows={forestRows}
+                      config={deConfig}
+                      darkMode={darkMode}
+                      svgRef={svgRef}
+                      onEditField={handleOpenPlotEdit}
+                    />
+                  )}
+                  {deConfig.plotType === 'roc' && (
+                    <ROCPlotChart
+                      rows={rocRows}
+                      config={deConfig}
+                      darkMode={darkMode}
+                      svgRef={svgRef}
+                      onEditField={handleOpenPlotEdit}
+                    />
+                  )}
+                  {deConfig.plotType === 'correlation' && (
+                    <CorrelationBlandAltmanPlot
+                      rows={corrRows}
+                      viewMode={corrViewMode}
+                      config={deConfig}
+                      darkMode={darkMode}
+                      svgRef={svgRef}
+                      onEditField={handleOpenPlotEdit}
+                    />
+                  )}
                 </>
               ) : (
                 <AntiBarplotCanvas
@@ -1559,9 +1837,20 @@ export function App() {
               </div>
             )}
 
-            {/* Studio 1 Inline Reproducibility Strip */}
+            {/* Studio 1 Plain-English Statistical Explainer & Reproducibility Strip */}
             {studio === 'plotter' && (
-              <div className="material-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+              <>
+                <PlotLaymanExplainer
+                  plotType={deConfig.plotType}
+                  pc1Var={pcaData.pc1Var}
+                  pc2Var={pcaData.pc2Var}
+                  dosePoints={dosePoints}
+                  survivalRows={survivalRows}
+                  rocRows={rocRows}
+                  corrRows={corrRows}
+                  soundEnabled={soundEnabled}
+                />
+                <div className="material-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
                     <Terminal className="w-4 h-4" />
@@ -1586,6 +1875,7 @@ export function App() {
                   Inspect Code Drawer →
                 </button>
               </div>
+              </>
             )}
           </section>
         </main>
