@@ -67,14 +67,17 @@ import {
   parseDotPlotRows,
   parseEmbeddingRows,
   parseForestRows,
+  parseHeatmapMatrix,
   parsePairXYRows,
   parsePathwayRows,
   parsePCARows,
+  parsePseudotimeRows,
   parseROCRows,
   parseSurvivalRows,
   parseTidyStatsTable,
   parseUpSetRows,
 } from './lib/csvParser';
+import type { CsvTemplateKey } from './lib/csvTemplates';
 import {
   EMBEDDING_MARKERS,
   generateDemoCorrelationData,
@@ -109,6 +112,7 @@ import {
 import { APPLE_SPRINGS, playAppleTick } from './motion/applePhysics';
 import { AppleSegmentedControl } from './components/ui/AppleSegmentedControl';
 import { FluidSheet } from './components/ui/FluidSheet';
+import { CsvFormatGuide } from './components/ui/CsvFormatGuide';
 import {
   InlinePlotEditor,
   type ActivePlotEdit,
@@ -147,6 +151,7 @@ export function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [codeSheetOpen, setCodeSheetOpen] = useState(false);
+  const [csvGuideOpen, setCsvGuideOpen] = useState(false);
   const [licenseSheetOpen, setLicenseSheetOpen] = useState(false);
   const [codeTab, setCodeTab] = useState<'r' | 'python' | 'cli'>('r');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -177,8 +182,8 @@ export function App() {
   const [pcaData, setPcaData] = useState<{ rows: PCASampleRow[]; pc1Var: number; pc2Var: number }>(() =>
     generateDemoPCAData()
   );
-  const [degHeatmap] = useState(() => generateDemoDEGHeatmap());
-  const [pseudotime] = useState(() => generateDemoPseudotime());
+  const [degHeatmap, setDegHeatmap] = useState(() => generateDemoDEGHeatmap());
+  const [pseudotime, setPseudotime] = useState(() => generateDemoPseudotime());
   const [dosePoints, setDosePoints] = useState<DosePoint[]>(() => generateDemoDoseResponse());
   const [survivalRows, setSurvivalRows] = useState<SurvivalRow[]>(() => generateDemoSurvivalData());
   const [forestRows, setForestRows] = useState<ForestRow[]>(() => generateDemoForestData());
@@ -399,107 +404,139 @@ export function App() {
     playAppleTick(soundEnabled, 'commit');
   };
 
-  const handleFileIngest = async (file: File) => {
-    const text = await file.text();
+  const ingestCsvText = (
+    text: string,
+    fileName: string,
+    explicitTarget?: CsvTemplateKey
+  ) => {
     const table = parseDelimitedText(text);
     if (table.rows.length === 0) {
       setUploadBanner('Could not parse any rows from that file — check that it has a CSV or TSV header.');
       return;
     }
 
-    if (studio === 'stats') {
+    const isStatsTarget = explicitTarget ? explicitTarget === 'stats-tidy' : studio === 'stats';
+    if (isStatsTarget) {
       const parsed = parseTidyStatsTable(table);
       if (parsed.rows.length > 0) {
+        setStudio('stats');
         setStatsRows(parsed.rows);
-        setStatsSourceFile(file.name);
+        setStatsSourceFile(fileName);
         setActiveStatsDemoId('custom');
         setStatsConfig((prev) => ({
           ...prev,
-          title: file.name.replace(/\.(csv|tsv|txt)$/i, ''),
+          title: fileName.replace(/\.(csv|tsv|txt)$/i, ''),
+          subtitle: '',
           xLabel: parsed.groupCol,
           yLabel: parsed.valueCol,
           isPaired: Boolean(parsed.subjectCol && !parsed.replicateCol),
           collapsePseudoreplicates: false,
         }));
         setUploadBanner(
-          `Loaded ${parsed.rows.length} rows from ${file.name} (Group: ${parsed.groupCol}, Value: ${parsed.valueCol}).`
+          `Loaded ${parsed.rows.length} rows from ${fileName} (Group: ${parsed.groupCol}, Value: ${parsed.valueCol}).`
         );
         playAppleTick(soundEnabled, 'commit');
       }
       return;
     }
 
-    if (deConfig.plotType === 'dotplot') {
+    const targetPlot: DEPlotType =
+      explicitTarget && explicitTarget !== 'stats-tidy' ? explicitTarget : deConfig.plotType;
+
+    if (explicitTarget && explicitTarget !== 'stats-tidy') {
+      setStudio('plotter');
+      setDeConfig((p) => ({ ...p, plotType: targetPlot }));
+      if (['umap', 'tsne', 'dotplot', 'pseudotime'].includes(targetPlot)) setPlotGroupTab('sc');
+      else if (['dose-response', 'survival', 'forest', 'roc', 'correlation'].includes(targetPlot))
+        setPlotGroupTab('clinical');
+      else setPlotGroupTab('de');
+    }
+
+    if (targetPlot === 'dotplot') {
       const rows = parseDotPlotRows(table);
       if (rows.length) {
         setDotPlotRows(rows);
-        setDeSourceFile(file.name);
-        setUploadBanner(`Loaded ${rows.length} marker × cluster entries from ${file.name}.`);
+        setDeSourceFile(fileName);
+        setUploadBanner(`Loaded ${rows.length} marker × cluster entries from ${fileName}.`);
       }
-    } else if (deConfig.plotType === 'upset') {
+    } else if (targetPlot === 'upset') {
       const items = parseUpSetRows(table);
       if (items.length) {
         setUpsetItems(items);
-        setDeSourceFile(file.name);
-        setUploadBanner(`Loaded ${items.length} set-membership items from ${file.name}.`);
+        setDeSourceFile(fileName);
+        setUploadBanner(`Loaded ${items.length} set-membership items from ${fileName}.`);
       }
-    } else if (deConfig.plotType === 'lollipop') {
+    } else if (targetPlot === 'lollipop') {
       const rows = parsePathwayRows(table);
       if (rows.length) {
         setPathwayRows(rows);
-        setDeSourceFile(file.name);
-        setUploadBanner(`Loaded ${rows.length} enriched pathways from ${file.name}.`);
+        setDeSourceFile(fileName);
+        setUploadBanner(`Loaded ${rows.length} enriched pathways from ${fileName}.`);
       }
-    } else if (deConfig.plotType === 'umap' || deConfig.plotType === 'tsne') {
+    } else if (targetPlot === 'umap' || targetPlot === 'tsne') {
       const parsed = parseEmbeddingRows(table);
       if (parsed.cells.length) {
         setEmbeddingCells(parsed.cells);
         if (parsed.markers.length) setEmbeddingMarkers(parsed.markers);
         setEmbeddingColorBy('cluster');
-        setDeSourceFile(file.name);
-        setUploadBanner(`Loaded ${parsed.cells.length} single cells from ${file.name}.`);
+        setDeSourceFile(fileName);
+        setUploadBanner(`Loaded ${parsed.cells.length} single cells from ${fileName}.`);
       }
-    } else if (deConfig.plotType === 'pca') {
+    } else if (targetPlot === 'pca') {
       const rows = parsePCARows(table);
       if (rows.length) {
         setPcaData((p) => ({ ...p, rows }));
-        setDeSourceFile(file.name);
-        setUploadBanner(`Loaded ${rows.length} PCA samples from ${file.name}.`);
+        setDeSourceFile(fileName);
+        setUploadBanner(`Loaded ${rows.length} PCA samples from ${fileName}.`);
       }
-    } else if (deConfig.plotType === 'dose-response') {
+    } else if (targetPlot === 'heatmap') {
+      const hm = parseHeatmapMatrix(table);
+      if (hm) {
+        setDegHeatmap(hm);
+        setDeSourceFile(fileName);
+        setUploadBanner(`Loaded ${hm.genes.length} genes × ${hm.samples.length} samples from ${fileName} (row z-scored).`);
+      }
+    } else if (targetPlot === 'pseudotime') {
+      const pt = parsePseudotimeRows(table);
+      if (pt) {
+        setPseudotime(pt);
+        setDeSourceFile(fileName);
+        setUploadBanner(`Smoothed ${pt.series.length} gene trajectories along pseudotime from ${fileName}.`);
+      }
+    } else if (targetPlot === 'dose-response') {
       const pts = parseDoseResponseRows(table);
       if (pts.length) {
         setDosePoints(pts);
-        setDeSourceFile(file.name);
-        setUploadBanner(`Fitted 4PL dose-response curve on ${pts.length} measurements from ${file.name}.`);
+        setDeSourceFile(fileName);
+        setUploadBanner(`Fitted 4PL dose-response curve on ${pts.length} measurements from ${fileName}.`);
       }
-    } else if (deConfig.plotType === 'survival') {
+    } else if (targetPlot === 'survival') {
       const rows = parseSurvivalRows(table);
       if (rows.length) {
         setSurvivalRows(rows);
-        setDeSourceFile(file.name);
-        setUploadBanner(`Computed Kaplan–Meier & Log-Rank test on ${rows.length} subjects from ${file.name}.`);
+        setDeSourceFile(fileName);
+        setUploadBanner(`Computed Kaplan–Meier & Log-Rank test on ${rows.length} subjects from ${fileName}.`);
       }
-    } else if (deConfig.plotType === 'forest') {
+    } else if (targetPlot === 'forest') {
       const rows = parseForestRows(table);
       if (rows.length) {
         setForestRows(rows);
-        setDeSourceFile(file.name);
-        setUploadBanner(`Loaded ${rows.length} hazard/odds ratios from ${file.name}.`);
+        setDeSourceFile(fileName);
+        setUploadBanner(`Loaded ${rows.length} hazard/odds ratios from ${fileName}.`);
       }
-    } else if (deConfig.plotType === 'roc') {
+    } else if (targetPlot === 'roc') {
       const rows = parseROCRows(table);
       if (rows.length) {
         setRocRows(rows);
-        setDeSourceFile(file.name);
-        setUploadBanner(`Computed ROC/AUROC on ${rows.length} observations from ${file.name}.`);
+        setDeSourceFile(fileName);
+        setUploadBanner(`Computed ROC/AUROC on ${rows.length} observations from ${fileName}.`);
       }
-    } else if (deConfig.plotType === 'correlation') {
+    } else if (targetPlot === 'correlation') {
       const rows = parsePairXYRows(table);
       if (rows.length) {
         setCorrRows(rows);
-        setDeSourceFile(file.name);
-        setUploadBanner(`Computed Pearson/Spearman & Bland–Altman on ${rows.length} pairs from ${file.name}.`);
+        setDeSourceFile(fileName);
+        setUploadBanner(`Computed Pearson/Spearman & Bland–Altman on ${rows.length} pairs from ${fileName}.`);
       }
     } else {
       const parsed = parseDERows(table);
@@ -510,19 +547,24 @@ export function App() {
           .slice(0, 8)
           .map((r) => r.gene);
         setVolcanoRows(parsed.rows);
-        setDeSourceFile(file.name);
+        setDeSourceFile(fileName);
         setDeConfig((prev) => ({
           ...prev,
-          title: `${file.name.replace(/\.(csv|tsv|txt)$/i, '')} (${parsed.detectedTool})`,
+          title: `${fileName.replace(/\.(csv|tsv|txt)$/i, '')}`,
           labeledGenes: autoTop,
           labelOffsets: {},
         }));
         setUploadBanner(
-          `Detected ${parsed.detectedTool} format · Loaded ${parsed.rows.length} genes from ${file.name}.`
+          `Detected ${parsed.detectedTool} format · Loaded ${parsed.rows.length} genes from ${fileName}.`
         );
       }
     }
     playAppleTick(soundEnabled, 'commit');
+  };
+
+  const handleFileIngest = async (file: File) => {
+    const text = await file.text();
+    ingestCsvText(text, file.name);
   };
 
   const generatedCode = useMemo(() => {
@@ -682,6 +724,18 @@ export function App() {
                   e.target.value = '';
                 }}
               />
+              <button
+                type="button"
+                onPointerDown={() => {
+                  setCsvGuideOpen(true);
+                  playAppleTick(soundEnabled, 'select');
+                }}
+                className="apple-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-primary)]"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500" />
+                <span className="hidden md:inline">CSV Guide</span>
+              </button>
+
               <button
                 type="button"
                 onPointerDown={() => fileInputRef.current?.click()}
@@ -1805,6 +1859,13 @@ export function App() {
                   }}
                 />
                 <LaymanStatsGuide analysis={statsAnalysis} soundEnabled={soundEnabled} />
+                <div className="material-card rounded-2xl p-5">
+                  <CsvFormatGuide
+                    activeKey="stats-tidy"
+                    soundEnabled={soundEnabled}
+                    onTestLoadCsv={(csv, name, key) => ingestCsvText(csv, name, key)}
+                  />
+                </div>
               </>
             )}
 
@@ -1860,7 +1921,7 @@ export function App() {
               </div>
             )}
 
-            {/* Studio 1 Plain-English Statistical Explainer & Reproducibility Strip */}
+            {/* Studio 1 Plain-English Statistical Explainer, CSV Format Guide & Reproducibility Strip */}
             {studio === 'plotter' && (
               <>
                 <PlotLaymanExplainer
@@ -1873,6 +1934,13 @@ export function App() {
                   corrRows={corrRows}
                   soundEnabled={soundEnabled}
                 />
+                <div className="material-card rounded-2xl p-5">
+                  <CsvFormatGuide
+                    activeKey={deConfig.plotType}
+                    soundEnabled={soundEnabled}
+                    onTestLoadCsv={(csv, name, key) => ingestCsvText(csv, name, key)}
+                  />
+                </div>
                 <div className="material-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
@@ -1976,6 +2044,25 @@ export function App() {
               </code>
             </pre>
           </div>
+        </FluidSheet>
+
+        {/* CSV Format Guide & Sample Templates Fluid Sheet */}
+        <FluidSheet
+          open={csvGuideOpen}
+          onClose={() => setCsvGuideOpen(false)}
+          title="CSV Format Guide & Sample Data"
+          subtitle="Downloadable templates & 1-click test data for all 16 plot formats"
+          soundEnabled={soundEnabled}
+        >
+          <CsvFormatGuide
+            activeKey={studio === 'stats' ? 'stats-tidy' : deConfig.plotType}
+            soundEnabled={soundEnabled}
+            showSelector
+            onTestLoadCsv={(csv, name, key) => {
+              ingestCsvText(csv, name, key);
+              setCsvGuideOpen(false);
+            }}
+          />
         </FluidSheet>
 
         {/* Academic-Only License Sheet */}

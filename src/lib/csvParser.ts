@@ -7,7 +7,13 @@ import type {
   VolcanoRow,
 } from '../types/biograce';
 import type { DosePoint, PairXYRow, ROCInputRow, SurvivalRow } from './bioAnalytics';
-import type { EmbeddingCell, ForestRow, PCASampleRow } from './advancedDemoData';
+import type {
+  DEGHeatmapData,
+  EmbeddingCell,
+  ForestRow,
+  PCASampleRow,
+  PseudotimeGeneSeries,
+} from './advancedDemoData';
 
 export interface ParsedTable {
   headers: string[];
@@ -335,4 +341,84 @@ export function parsePairXYRows(table: ParsedTable): PairXYRow[] {
       y: Number(r[yCol]),
     }))
     .filter((r) => Number.isFinite(r.x) && Number.isFinite(r.y));
+}
+
+/** Parse wide Gene x Sample expression matrix and compute row-wise z-scores */
+export function parseHeatmapMatrix(table: ParsedTable): DEGHeatmapData | null {
+  const { headers, rows } = table;
+  if (headers.length < 3 || rows.length === 0) return null;
+  const geneCol = headers[0];
+  const sampleCols = headers.slice(1);
+  const samples = sampleCols.map((id) => ({
+    id,
+    group: id.includes('_') ? id.split('_')[0] : id.replace(/\d+$/, '') || 'Group',
+  }));
+  const genes: string[] = [];
+  const zMatrix: number[][] = [];
+  for (const r of rows) {
+    const g = (r[geneCol] ?? '').trim();
+    if (!g) continue;
+    const vals = sampleCols.map((c) => Number(r[c]));
+    if (vals.some((v) => !Number.isFinite(v))) continue;
+    const m = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const s = Math.sqrt(vals.reduce((a, v) => a + (v - m) ** 2, 0) / Math.max(1, vals.length - 1)) || 1;
+    genes.push(g);
+    zMatrix.push(vals.map((v) => Number(Math.max(-2.5, Math.min(2.5, (v - m) / s)).toFixed(2))));
+  }
+  return genes.length > 0 ? { genes, samples, zMatrix } : null;
+}
+
+/** Parse tidy pseudotime table (pseudotime, gene, expression) into smoothed ribbons */
+export function parsePseudotimeRows(table: ParsedTable): {
+  stages: { label: string; start: number; end: number }[];
+  series: PseudotimeGeneSeries[];
+} | null {
+  const { headers, rows } = table;
+  const tCol = findColumn(headers, ['pseudotime', 'time', 't', 'pt']) ?? headers[0];
+  const gCol = findColumn(headers, ['gene', 'marker', 'feature']) ?? headers[1];
+  const eCol = findColumn(headers, ['expression', 'expr', 'value', 'y']) ?? headers[2];
+  const byGene = new Map<string, { t: number; v: number }[]>();
+  for (const r of rows) {
+    const t = Number(r[tCol]);
+    const v = Number(r[eCol]);
+    const g = (r[gCol] ?? '').trim();
+    if (!g || !Number.isFinite(t) || !Number.isFinite(v)) continue;
+    if (!byGene.has(g)) byGene.set(g, []);
+    byGene.get(g)!.push({ t, v });
+  }
+  if (byGene.size === 0) return null;
+  const allT = [...byGene.values()].flat().map((x) => x.t);
+  const tMin = Math.min(...allT);
+  const tMax = Math.max(...allT);
+  const span = tMax - tMin || 1;
+  const series: PseudotimeGeneSeries[] = [...byGene.entries()].slice(0, 6).map(([gene, pts]) => {
+    const normPts = pts.map((p) => ({ t: (p.t - tMin) / span, v: p.v }));
+    const smoothed = Array.from({ length: 25 }, (_, i) => {
+      const gridT = i / 24;
+      let wSum = 0;
+      let ySum = 0;
+      for (const p of normPts) {
+        const w = Math.exp(-((p.t - gridT) ** 2) / 0.018);
+        wSum += w;
+        ySum += w * p.v;
+      }
+      const meanVal = wSum > 0 ? ySum / wSum : 0;
+      let varSum = 0;
+      for (const p of normPts) {
+        const w = Math.exp(-((p.t - gridT) ** 2) / 0.018);
+        varSum += w * (p.v - meanVal) ** 2;
+      }
+      const sdVal = wSum > 0 ? Math.sqrt(varSum / wSum) : 0.2;
+      return { t: gridT, mean: Number(meanVal.toFixed(3)), ci: Number(Math.min(0.8, sdVal * 0.6).toFixed(3)) };
+    });
+    return { gene, points: smoothed };
+  });
+  return {
+    stages: [
+      { label: 'Early', start: 0, end: 0.33 },
+      { label: 'Intermediate', start: 0.33, end: 0.67 },
+      { label: 'Late', start: 0.67, end: 1.0 },
+    ],
+    series,
+  };
 }
