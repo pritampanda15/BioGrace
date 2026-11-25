@@ -305,6 +305,11 @@ export const COLORMAPS: Record<ColormapId, ColormapSpec> = {
     name: 'Cubehelix_r',
     stops: ['#FFFFFF', '#D8C7E2', '#9D88B8', '#5B6284', '#284550', '#16271C', '#000000'],
   },
+  Greys: {
+    id: 'Greys',
+    name: 'Greys (Monochrome)',
+    stops: ['#F8FAFC', '#CBD5E1', '#94A3B8', '#475569', '#0F172A'],
+  },
 };
 
 export const COLORMAP_LIST = Object.values(COLORMAPS);

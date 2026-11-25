@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import type { DEPlotConfig } from '../../types/biograce';
 import type { ROCInputRow } from '../../lib/bioAnalytics';
-import type { EditablePlotField } from '../ui/InlinePlotEditor';
+import type { OnEditPlotField } from '../ui/InlinePlotEditor';
 import { computeROCCurves } from '../../lib/bioAnalytics';
 import { resolvePlotTheme } from '../../lib/palettes';
 
@@ -10,7 +10,7 @@ interface ROCPlotChartProps {
   config: DEPlotConfig;
   darkMode: boolean;
   svgRef: React.RefObject<SVGSVGElement | null>;
-  onEditField: (field: EditablePlotField, label: string, currentValue: string) => void;
+  onEditField: OnEditPlotField;
 }
 
 const WIDTH = 840;
@@ -151,25 +151,50 @@ export const ROCPlotChart: React.FC<ROCPlotChartProps> = ({
           );
         })}
 
-        {/* Right Side AUROC Table Legend */}
+        {/* Right Side AUROC Table Legend (Click any model name or header to edit inline) */}
         <g transform={`translate(${MARGIN.left + side + 26}, ${MARGIN.top + 24})`}>
-          <text x={0} y={0} fill={inkPrimary} fontSize={11.5 * theme.fontScale} fontWeight={700}>
-            Model AUROC (95% CI)
+          <text
+            x={0}
+            y={0}
+            fill={inkPrimary}
+            fontSize={11.5 * theme.fontScale}
+            fontWeight={700}
+            style={{ cursor: 'text' }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onEditField('legend', 'Legend Title', config.legendLabels?.['roc_title'] ?? 'Model AUROC (95% CI)', 'roc_title');
+            }}
+          >
+            {config.legendLabels?.['roc_title'] ?? 'Model AUROC (95% CI)'}
           </text>
-          {models.map((m, i) => (
-            <g key={m.model} transform={`translate(0, ${28 + i * 48})`}>
-              <line x1={0} x2={18} y1={-4} y2={-4} stroke={palette.colors[i % palette.colors.length]} strokeWidth={3} />
-              <text x={24} y={0} fill={inkPrimary} fontSize={11 * theme.fontScale} fontWeight={700}>
-                {m.model}
-              </text>
-              <text x={24} y={16} fill={inkSecondary} fontSize={10.5 * theme.fontScale}>
-                AUC = {m.auc.toFixed(3)} ({m.ciLow.toFixed(2)}–{m.ciHigh.toFixed(2)})
-              </text>
-              <text x={24} y={30} fill={inkSecondary} fontSize={9.5 * theme.fontScale}>
-                Best Youden J = {m.youdenJ.toFixed(2)} (Sens {Math.round(m.bestTpr * 100)}%, Spec {Math.round((1 - m.bestFpr) * 100)}%)
-              </text>
-            </g>
-          ))}
+          {models.map((m, i) => {
+            const lbl = config.legendLabels?.[`roc_${m.model}`] ?? m.model;
+            return (
+              <g key={m.model} transform={`translate(0, ${28 + i * 48})`}>
+                <line x1={0} x2={18} y1={-4} y2={-4} stroke={palette.colors[i % palette.colors.length]} strokeWidth={3} />
+                <text
+                  x={24}
+                  y={0}
+                  fill={inkPrimary}
+                  fontSize={11 * theme.fontScale}
+                  fontWeight={700}
+                  style={{ cursor: 'text' }}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    onEditField('legend', `Model (${m.model})`, lbl, `roc_${m.model}`);
+                  }}
+                >
+                  {lbl}
+                </text>
+                <text x={24} y={16} fill={inkSecondary} fontSize={10.5 * theme.fontScale}>
+                  AUC = {m.auc.toFixed(3)} ({m.ciLow.toFixed(2)}–{m.ciHigh.toFixed(2)})
+                </text>
+                <text x={24} y={30} fill={inkSecondary} fontSize={9.5 * theme.fontScale}>
+                  Best Youden J = {m.youdenJ.toFixed(2)} (Sens {Math.round(m.bestTpr * 100)}%, Spec {Math.round((1 - m.bestFpr) * 100)}%)
+                </text>
+              </g>
+            );
+          })}
         </g>
 
         {/* Axis Titles */}

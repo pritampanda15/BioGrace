@@ -48,7 +48,8 @@ export type ColormapId =
   | 'turbo'
   | 'Blues'
   | 'YlGnBu'
-  | 'cubehelix_r';
+  | 'cubehelix_r'
+  | 'Greys';
 
 export type FontFamilyChoice = 'sans-serif' | 'serif' | 'monospace';
 
@@ -157,6 +158,7 @@ export interface PublicationStyleSettings {
   dpi: 300 | 600 | 1200;
   transparentBg: boolean;
   paperExport: boolean;
+  legendLabels?: Record<string, string>;
 }
 
 export interface DEPlotConfig extends PublicationStyleSettings {

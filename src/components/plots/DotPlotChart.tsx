@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { DEPlotConfig, DotPlotRow } from '../../types/biograce';
-import type { EditablePlotField } from '../ui/InlinePlotEditor';
+import type { OnEditPlotField } from '../ui/InlinePlotEditor';
 import { resolvePlotTheme, sampleRamp } from '../../lib/palettes';
 
 interface DotPlotChartProps {
@@ -8,7 +8,7 @@ interface DotPlotChartProps {
   config: DEPlotConfig;
   darkMode: boolean;
   svgRef: React.RefObject<SVGSVGElement | null>;
-  onEditField: (field: EditablePlotField, label: string, currentValue: string) => void;
+  onEditField: OnEditPlotField;
 }
 
 const WIDTH = 840;
@@ -220,10 +220,21 @@ export const DotPlotChart: React.FC<DotPlotChartProps> = ({
           })}
         </g>
 
-        {/* Self-contained Publication Legend */}
+        {/* Self-contained Publication Legend (Click headers to edit inline) */}
         <g transform={`translate(${WIDTH - MARGIN.right + 22}, ${MARGIN.top + 8})`}>
-          <text x={0} y={0} fill={inkPrimary} fontSize={11 * theme.fontScale} fontWeight={700}>
-            Mean Expr ({colormap.name})
+          <text
+            x={0}
+            y={0}
+            fill={inkPrimary}
+            fontSize={11 * theme.fontScale}
+            fontWeight={700}
+            style={{ cursor: 'text' }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onEditField('legend', 'Colorbar Title', config.legendLabels?.['dot_color'] ?? 'Mean Expr (z)', 'dot_color');
+            }}
+          >
+            {config.legendLabels?.['dot_color'] ?? 'Mean Expr (z)'}
           </text>
           <rect
             x={0}
@@ -245,8 +256,19 @@ export const DotPlotChart: React.FC<DotPlotChartProps> = ({
             {minExpr.toFixed(1)}
           </text>
 
-          <text x={0} y={168} fill={inkPrimary} fontSize={11 * theme.fontScale} fontWeight={700}>
-            % Expressed
+          <text
+            x={0}
+            y={168}
+            fill={inkPrimary}
+            fontSize={11 * theme.fontScale}
+            fontWeight={700}
+            style={{ cursor: 'text' }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onEditField('legend', 'Size Legend Title', config.legendLabels?.['dot_size'] ?? '% Expressed', 'dot_size');
+            }}
+          >
+            {config.legendLabels?.['dot_size'] ?? '% Expressed'}
           </text>
           {[25, 50, 75, 100].map((pct, idx) => {
             const rad = Math.max(2, Math.sqrt(pct / 100) * maxR);

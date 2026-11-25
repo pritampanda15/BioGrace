@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import type { DEPlotConfig } from '../../types/biograce';
 import type { PCASampleRow } from '../../lib/advancedDemoData';
-import type { EditablePlotField } from '../ui/InlinePlotEditor';
+import type { OnEditPlotField } from '../ui/InlinePlotEditor';
 import { computeConfidenceEllipse } from '../../lib/bioAnalytics';
 import { resolvePlotTheme } from '../../lib/palettes';
 
@@ -12,7 +12,7 @@ interface PCAPlotProps {
   config: DEPlotConfig;
   darkMode: boolean;
   svgRef: React.RefObject<SVGSVGElement | null>;
-  onEditField: (field: EditablePlotField, label: string, currentValue: string) => void;
+  onEditField: OnEditPlotField;
 }
 
 const WIDTH = 840;
@@ -234,17 +234,44 @@ export const PCAPlot: React.FC<PCAPlotProps> = ({
           {config.yLabel || defaultY}
         </text>
 
-        {/* Legend */}
+        {/* Legend (Click any label to edit inline) */}
         <g transform={`translate(${WIDTH - MARGIN.right + 18}, ${MARGIN.top + 12})`}>
-          <text x={0} y={0} fill={inkPrimary} fontSize={11 * theme.fontScale} fontWeight={700}>Group (95% CI)</text>
-          {ellipses.map((e, i) => (
-            <g key={e.group} transform={`translate(0, ${22 + i * 24})`}>
-              <circle cx={6} cy={-3} r={5} fill={palette.colors[i % palette.colors.length]} />
-              <text x={18} y={1} fill={inkPrimary} fontSize={10.5 * theme.fontScale} fontWeight={500}>
-                {e.group} (n={e.n})
-              </text>
-            </g>
-          ))}
+          <text
+            x={0}
+            y={0}
+            fill={inkPrimary}
+            fontSize={11 * theme.fontScale}
+            fontWeight={700}
+            style={{ cursor: 'text' }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onEditField('legend', 'Legend Title', config.legendLabels?.['pca_title'] ?? 'Group (95% CI)', 'pca_title');
+            }}
+          >
+            {config.legendLabels?.['pca_title'] ?? 'Group (95% CI)'}
+          </text>
+          {ellipses.map((e, i) => {
+            const lbl = config.legendLabels?.[`pca_${e.group}`] ?? e.group;
+            return (
+              <g key={e.group} transform={`translate(0, ${22 + i * 24})`}>
+                <circle cx={6} cy={-3} r={5} fill={palette.colors[i % palette.colors.length]} />
+                <text
+                  x={18}
+                  y={1}
+                  fill={inkPrimary}
+                  fontSize={10.5 * theme.fontScale}
+                  fontWeight={500}
+                  style={{ cursor: 'text' }}
+                  onPointerDown={(ev) => {
+                    ev.stopPropagation();
+                    onEditField('legend', `Legend (${e.group})`, lbl, `pca_${e.group}`);
+                  }}
+                >
+                  {lbl} (n={e.n})
+                </text>
+              </g>
+            );
+          })}
         </g>
       </svg>
 

@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import type { DEPlotConfig } from '../../types/biograce';
 import type { EmbeddingCell } from '../../lib/advancedDemoData';
-import type { EditablePlotField } from '../ui/InlinePlotEditor';
+import type { OnEditPlotField } from '../ui/InlinePlotEditor';
 import { resolvePlotTheme, sampleRamp } from '../../lib/palettes';
 import { playAppleTick } from '../../motion/applePhysics';
 
@@ -15,7 +15,7 @@ interface EmbeddingPlotProps {
   darkMode: boolean;
   soundEnabled: boolean;
   svgRef: React.RefObject<SVGSVGElement | null>;
-  onEditField: (field: EditablePlotField, label: string, currentValue: string) => void;
+  onEditField: OnEditPlotField;
 }
 
 const WIDTH = 840;
@@ -285,7 +285,7 @@ export const EmbeddingPlot: React.FC<EmbeddingPlotProps> = ({
                       onPointerMove={onDragMove}
                       onPointerUp={onDragEnd}
                     >
-                      {cent.cluster}
+                      {config.legendLabels?.[`emb_${cent.cluster}`] ?? cent.cluster}
                     </text>
                   );
                 })}
@@ -342,12 +342,23 @@ export const EmbeddingPlot: React.FC<EmbeddingPlotProps> = ({
           );
         })}
 
-        {/* Right Side Legend (Interactive Cluster Isolate OR FeaturePlot Colorbar) */}
+        {/* Right Side Legend (Click circle to isolate; click any text to edit inline) */}
         <g transform={`translate(${WIDTH - MARGIN.right + 20}, ${MARGIN.top + 8})`}>
           {isFeatureMode ? (
             <>
-              <text x={0} y={0} fill={inkPrimary} fontSize={11 * theme.fontScale} fontWeight={700}>
-                {colorBy} (log1p)
+              <text
+                x={0}
+                y={0}
+                fill={inkPrimary}
+                fontSize={11 * theme.fontScale}
+                fontWeight={700}
+                style={{ cursor: 'text' }}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  onEditField('legend', 'Legend Title', config.legendLabels?.['emb_feat'] ?? `${colorBy} (log1p)`, 'emb_feat');
+                }}
+              >
+                {config.legendLabels?.['emb_feat'] ?? `${colorBy} (log1p)`}
               </text>
               <rect x={0} y={14} width={15} height={140} rx={3} fill={`url(#${gradId})`} stroke={inkAxis} strokeOpacity={0.3} />
               <text x={22} y={24} fill={inkSecondary} fontSize={10 * theme.fontScale}>{exprMax.toFixed(1)}</text>
@@ -356,31 +367,61 @@ export const EmbeddingPlot: React.FC<EmbeddingPlotProps> = ({
             </>
           ) : (
             <>
-              <text x={0} y={0} fill={inkPrimary} fontSize={11 * theme.fontScale} fontWeight={700}>
-                Cell Types
+              <text
+                x={0}
+                y={0}
+                fill={inkPrimary}
+                fontSize={11 * theme.fontScale}
+                fontWeight={700}
+                style={{ cursor: 'text' }}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  onEditField('legend', 'Legend Title', config.legendLabels?.['emb_title'] ?? 'Cell Types', 'emb_title');
+                }}
+              >
+                {config.legendLabels?.['emb_title'] ?? 'Cell Types'}
               </text>
               {centroids.map((cent, i) => {
                 const active = isolatedCluster === cent.cluster;
                 const dimmed = isolatedCluster !== null && !active;
+                const displayName = config.legendLabels?.[`emb_${cent.cluster}`] ?? cent.cluster;
                 return (
                   <g
                     key={cent.cluster}
                     transform={`translate(0, ${22 + i * 24})`}
-                    style={{ cursor: 'pointer', opacity: dimmed ? 0.35 : 1 }}
-                    onPointerDown={() => {
-                      setIsolatedCluster(active ? null : cent.cluster);
-                      playAppleTick(soundEnabled, 'select');
-                    }}
+                    style={{ opacity: dimmed ? 0.35 : 1 }}
                   >
-                    <circle cx={6} cy={-3} r={5} fill={palette.colors[i % palette.colors.length]} />
-                    <text x={18} y={1} fill={inkPrimary} fontSize={10.5 * theme.fontScale} fontWeight={active ? 700 : 500}>
-                      {cent.cluster} ({cent.count})
+                    <circle
+                      cx={6}
+                      cy={-3}
+                      r={5.5}
+                      fill={palette.colors[i % palette.colors.length]}
+                      style={{ cursor: 'pointer' }}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        setIsolatedCluster(active ? null : cent.cluster);
+                        playAppleTick(soundEnabled, 'select');
+                      }}
+                    />
+                    <text
+                      x={18}
+                      y={1}
+                      fill={inkPrimary}
+                      fontSize={10.5 * theme.fontScale}
+                      fontWeight={active ? 700 : 500}
+                      style={{ cursor: 'text' }}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        onEditField('legend', `Legend (${cent.cluster})`, displayName, `emb_${cent.cluster}`);
+                      }}
+                    >
+                      {displayName} ({cent.count})
                     </text>
                   </g>
                 );
               })}
               <text x={0} y={28 + centroids.length * 24} fill={inkSecondary} fontSize={9.5}>
-                Click legend to isolate
+                Dot = isolate · Text = edit
               </text>
             </>
           )}

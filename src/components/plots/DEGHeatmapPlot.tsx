@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { DEPlotConfig } from '../../types/biograce';
 import type { DEGHeatmapData } from '../../lib/advancedDemoData';
-import type { EditablePlotField } from '../ui/InlinePlotEditor';
+import type { OnEditPlotField } from '../ui/InlinePlotEditor';
 import { resolvePlotTheme, sampleRamp } from '../../lib/palettes';
 
 interface DEGHeatmapPlotProps {
@@ -9,7 +9,7 @@ interface DEGHeatmapPlotProps {
   config: DEPlotConfig;
   darkMode: boolean;
   svgRef: React.RefObject<SVGSVGElement | null>;
-  onEditField: (field: EditablePlotField, label: string, currentValue: string) => void;
+  onEditField: OnEditPlotField;
 }
 
 const WIDTH = 840;
@@ -159,21 +159,62 @@ export const DEGHeatmapPlot: React.FC<DEGHeatmapPlotProps> = ({
           </text>
         ))}
 
-        {/* Legend (Colorbar + Condition Track) */}
+        {/* Legend (Click any header or group label to edit inline) */}
         <g transform={`translate(${WIDTH - MARGIN.right + 20}, ${MARGIN.top})`}>
-          <text x={0} y={0} fill={inkPrimary} fontSize={11 * theme.fontScale} fontWeight={700}>Row Z-Score</text>
+          <text
+            x={0}
+            y={0}
+            fill={inkPrimary}
+            fontSize={11 * theme.fontScale}
+            fontWeight={700}
+            style={{ cursor: 'text' }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onEditField('legend', 'Colorbar Title', config.legendLabels?.['hm_z'] ?? 'Row Z-Score', 'hm_z');
+            }}
+          >
+            {config.legendLabels?.['hm_z'] ?? 'Row Z-Score'}
+          </text>
           <rect x={0} y={12} width={14} height={118} rx={3} fill={`url(#${gradId})`} stroke={inkAxis} strokeOpacity={0.3} />
           <text x={22} y={22} fill={inkSecondary} fontSize={10 * theme.fontScale}>+2.5</text>
           <text x={22} y={74} fill={inkSecondary} fontSize={10 * theme.fontScale}>0.0</text>
           <text x={22} y={128} fill={inkSecondary} fontSize={10 * theme.fontScale}>−2.5</text>
 
-          <text x={0} y={168} fill={inkPrimary} fontSize={11 * theme.fontScale} fontWeight={700}>Condition</text>
-          {groups.map((g, i) => (
-            <g key={g} transform={`translate(0, ${188 + i * 22})`}>
-              <rect width={12} height={12} y={-9} rx={3} fill={palette.colors[i % palette.colors.length]} />
-              <text x={18} y={1} fill={inkPrimary} fontSize={10.5 * theme.fontScale}>{g}</text>
-            </g>
-          ))}
+          <text
+            x={0}
+            y={168}
+            fill={inkPrimary}
+            fontSize={11 * theme.fontScale}
+            fontWeight={700}
+            style={{ cursor: 'text' }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onEditField('legend', 'Condition Legend Title', config.legendLabels?.['hm_cond'] ?? 'Condition', 'hm_cond');
+            }}
+          >
+            {config.legendLabels?.['hm_cond'] ?? 'Condition'}
+          </text>
+          {groups.map((g, i) => {
+            const lbl = config.legendLabels?.[`hm_${g}`] ?? g;
+            return (
+              <g key={g} transform={`translate(0, ${188 + i * 22})`}>
+                <rect width={12} height={12} y={-9} rx={3} fill={palette.colors[i % palette.colors.length]} />
+                <text
+                  x={18}
+                  y={1}
+                  fill={inkPrimary}
+                  fontSize={10.5 * theme.fontScale}
+                  style={{ cursor: 'text' }}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    onEditField('legend', `Condition (${g})`, lbl, `hm_${g}`);
+                  }}
+                >
+                  {lbl}
+                </text>
+              </g>
+            );
+          })}
         </g>
       </svg>
 

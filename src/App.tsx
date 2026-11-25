@@ -304,15 +304,29 @@ export function App() {
   };
 
   const handleOpenPlotEdit = useCallback(
-    (field: EditablePlotField, label: string, currentValue: string) => {
-      setActivePlotEdit({ field, label, value: currentValue });
+    (field: EditablePlotField, label: string, currentValue: string, legendKey?: string) => {
+      setActivePlotEdit({ field, label, value: currentValue, legendKey });
       playAppleTick(soundEnabled, 'select');
     },
     [soundEnabled]
   );
 
   const handleCommitPlotEdit = useCallback(
-    (field: EditablePlotField, nextValue: string) => {
+    (field: EditablePlotField, nextValue: string, legendKey?: string) => {
+      if (field === 'legend' && legendKey) {
+        if (studio === 'stats') {
+          setStatsConfig((prev) => ({
+            ...prev,
+            legendLabels: { ...(prev.legendLabels ?? {}), [legendKey]: nextValue },
+          }));
+        } else {
+          setDeConfig((prev) => ({
+            ...prev,
+            legendLabels: { ...(prev.legendLabels ?? {}), [legendKey]: nextValue },
+          }));
+        }
+        return;
+      }
       if (studio === 'gallery') {
         setGalleryTitles((prev) => ({
           ...prev,
@@ -1272,7 +1286,16 @@ export function App() {
                       key={pal.id}
                       type="button"
                       onPointerDown={() => {
-                        patchActiveStyle({ palette: pal.id as PaletteId });
+                        const pid = pal.id as PaletteId;
+                        const syncedCmap: Partial<PublicationStyleSettings> =
+                          pid === 'grayscale-pub'
+                            ? { colormap: 'Greys' }
+                            : pid === 'viridis-discrete'
+                            ? { colormap: 'viridis' }
+                            : activeStyle.colormap === 'Greys'
+                            ? { colormap: 'RdYlBu_r' }
+                            : {};
+                        patchActiveStyle({ palette: pid, ...syncedCmap });
                         playAppleTick(soundEnabled, 'select');
                       }}
                       className={`apple-press w-full px-2.5 py-1.5 rounded-xl border flex items-center justify-between gap-2 transition-colors ${
@@ -1539,7 +1562,7 @@ export function App() {
               <div className="mb-2.5 px-1 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[var(--text-tertiary)]">
                 <span className="flex items-center gap-1.5">
                   <Pencil className="w-3 h-3 text-[var(--accent)]" />
-                  Click any title, subtitle, or axis label on the plot to edit inline
+                  Click any title, axis, or legend label on the plot to edit inline
                 </span>
                 <div className="flex items-center gap-1.5">
                   <button

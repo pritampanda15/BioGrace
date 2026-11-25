@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import type { DEPlotConfig } from '../../types/biograce';
 import type { SurvivalRow } from '../../lib/bioAnalytics';
-import type { EditablePlotField } from '../ui/InlinePlotEditor';
+import type { OnEditPlotField } from '../ui/InlinePlotEditor';
 import { computeKaplanMeier } from '../../lib/bioAnalytics';
 import { formatPValue } from '../../lib/statsEngine';
 import { resolvePlotTheme } from '../../lib/palettes';
@@ -11,7 +11,7 @@ interface SurvivalKMPlotProps {
   config: DEPlotConfig;
   darkMode: boolean;
   svgRef: React.RefObject<SVGSVGElement | null>;
-  onEditField: (field: EditablePlotField, label: string, currentValue: string) => void;
+  onEditField: OnEditPlotField;
 }
 
 const WIDTH = 840;
@@ -183,14 +183,28 @@ export const SurvivalKMPlot: React.FC<SurvivalKMPlotProps> = ({
         </g>
 
         <g transform={`translate(${WIDTH - MARGIN.right - 235}, ${MARGIN.top + 16})`}>
-          {km.arms.map((arm, i) => (
-            <g key={arm.group} transform={`translate(0, ${i * 22})`}>
-              <line x1={0} x2={18} y1={0} y2={0} stroke={palette.colors[i % palette.colors.length]} strokeWidth={2.8} />
-              <text x={24} y={4} fill={inkPrimary} fontSize={baseFs - 1.2} fontWeight={600}>
-                {arm.group} (med: {arm.medianSurvival !== null ? `${arm.medianSurvival} mo` : 'NR'})
-              </text>
-            </g>
-          ))}
+          {km.arms.map((arm, i) => {
+            const lbl = config.legendLabels?.[`km_${arm.group}`] ?? arm.group;
+            return (
+              <g key={arm.group} transform={`translate(0, ${i * 22})`}>
+                <line x1={0} x2={18} y1={0} y2={0} stroke={palette.colors[i % palette.colors.length]} strokeWidth={2.8} />
+                <text
+                  x={24}
+                  y={4}
+                  fill={inkPrimary}
+                  fontSize={baseFs - 1.2}
+                  fontWeight={600}
+                  style={{ cursor: 'text' }}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    onEditField('legend', `Arm (${arm.group})`, lbl, `km_${arm.group}`);
+                  }}
+                >
+                  {lbl} (med: {arm.medianSurvival !== null ? `${arm.medianSurvival} mo` : 'NR'})
+                </text>
+              </g>
+            );
+          })}
         </g>
 
         {/* Axis Titles */}
@@ -238,8 +252,14 @@ export const SurvivalKMPlot: React.FC<SurvivalKMPlotProps> = ({
                 fill={palette.colors[idx % palette.colors.length]}
                 fontSize={baseFs - 1.4}
                 fontWeight={600}
+                style={{ cursor: 'text' }}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  const lbl = config.legendLabels?.[`km_${arm.group}`] ?? arm.group;
+                  onEditField('legend', `Arm (${arm.group})`, lbl, `km_${arm.group}`);
+                }}
               >
-                {arm.group}
+                {config.legendLabels?.[`km_${arm.group}`] ?? arm.group}
               </text>
               {km.riskTimes.map((t, ti) => (
                 <text

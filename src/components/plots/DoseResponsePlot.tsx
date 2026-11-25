@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import type { DEPlotConfig } from '../../types/biograce';
 import type { DosePoint, HillFitResult } from '../../lib/bioAnalytics';
-import type { EditablePlotField } from '../ui/InlinePlotEditor';
+import type { OnEditPlotField } from '../ui/InlinePlotEditor';
 import { fitDoseResponse4PL, formatConc } from '../../lib/bioAnalytics';
 import { resolvePlotTheme } from '../../lib/palettes';
 
@@ -10,7 +10,7 @@ interface DoseResponsePlotProps {
   config: DEPlotConfig;
   darkMode: boolean;
   svgRef: React.RefObject<SVGSVGElement | null>;
-  onEditField: (field: EditablePlotField, label: string, currentValue: string) => void;
+  onEditField: OnEditPlotField;
 }
 
 const WIDTH = 840;
@@ -190,12 +190,16 @@ export const DoseResponsePlot: React.FC<DoseResponsePlotProps> = ({
               {/* IC50 inflection marker */}
               <circle cx={icX} cy={midY} r={5.8} fill={strokeHalo} stroke={col} strokeWidth={2.4} />
               <text
-                x={icX + (idx === 0 ? -8 : 8)}
-                y={MARGIN.top + plotH - 12 - idx * 16}
+                x={icX + (idx === 0 ? -10 : 10)}
+                y={midY - 12}
                 textAnchor={idx === 0 ? 'end' : 'start'}
                 fill={col}
-                fontSize={baseFs - 1.2}
+                fontSize={baseFs - 1}
                 fontWeight={700}
+                paintOrder="stroke"
+                stroke={strokeHalo}
+                strokeWidth={4}
+                strokeLinejoin="round"
               >
                 IC50 = {formatConc(fit.ic50)}
               </text>
@@ -203,17 +207,31 @@ export const DoseResponsePlot: React.FC<DoseResponsePlotProps> = ({
           );
         })}
 
-        {/* Legend (Top Right inside plot) */}
+        {/* Legend (Top Right inside plot — click to edit compound names) */}
         <g transform={`translate(${WIDTH - MARGIN.right - 220}, ${MARGIN.top + 16})`}>
-          {fits.map((f, i) => (
-            <g key={f.compound} transform={`translate(0, ${i * 22})`}>
-              <line x1={0} x2={18} y1={0} y2={0} stroke={palette.colors[i % palette.colors.length]} strokeWidth={2.8} />
-              <circle cx={9} cy={0} r={3.5} fill={palette.colors[i % palette.colors.length]} />
-              <text x={24} y={4} fill={inkPrimary} fontSize={baseFs - 1} fontWeight={600}>
-                {f.compound}
-              </text>
-            </g>
-          ))}
+          {fits.map((f, i) => {
+            const lbl = config.legendLabels?.[`dose_${f.compound}`] ?? f.compound;
+            return (
+              <g key={f.compound} transform={`translate(0, ${i * 22})`}>
+                <line x1={0} x2={18} y1={0} y2={0} stroke={palette.colors[i % palette.colors.length]} strokeWidth={2.8} />
+                <circle cx={9} cy={0} r={3.5} fill={palette.colors[i % palette.colors.length]} />
+                <text
+                  x={24}
+                  y={4}
+                  fill={inkPrimary}
+                  fontSize={baseFs - 1}
+                  fontWeight={600}
+                  style={{ cursor: 'text' }}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    onEditField('legend', `Compound (${f.compound})`, lbl, `dose_${f.compound}`);
+                  }}
+                >
+                  {lbl}
+                </text>
+              </g>
+            );
+          })}
         </g>
 
         {/* Axis Titles */}

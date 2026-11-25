@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { DEPlotConfig, PathwayRow } from '../../types/biograce';
-import type { EditablePlotField } from '../ui/InlinePlotEditor';
+import type { OnEditPlotField } from '../ui/InlinePlotEditor';
 import { resolvePlotTheme } from '../../lib/palettes';
 import { APPLE_SPRINGS } from '../../motion/applePhysics';
 
@@ -10,7 +10,7 @@ interface PathwayLollipopPlotProps {
   config: DEPlotConfig;
   darkMode: boolean;
   svgRef: React.RefObject<SVGSVGElement | null>;
-  onEditField: (field: EditablePlotField, label: string, currentValue: string) => void;
+  onEditField: OnEditPlotField;
 }
 
 const WIDTH = 840;
@@ -243,22 +243,64 @@ export const PathwayLollipopPlot: React.FC<PathwayLollipopPlotProps> = ({
           );
         })}
 
-        {/* Legend */}
+        {/* Legend (Click any label to edit inline) */}
         <g transform={`translate(${WIDTH - MARGIN.right + 20}, ${MARGIN.top + 12})`}>
-          <text x={0} y={0} fill={inkPrimary} fontSize={11 * theme.fontScale} fontWeight={700}>
-            Direction
+          <text
+            x={0}
+            y={0}
+            fill={inkPrimary}
+            fontSize={11 * theme.fontScale}
+            fontWeight={700}
+            style={{ cursor: 'text' }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onEditField('legend', 'Legend Title', config.legendLabels?.['lol_dir'] ?? 'Direction', 'lol_dir');
+            }}
+          >
+            {config.legendLabels?.['lol_dir'] ?? 'Direction'}
           </text>
           <circle cx={6} cy={18} r={5} fill={palette.upColor} />
-          <text x={18} y={22} fill={inkSecondary} fontSize={10.5 * theme.fontScale}>
-            Activated
+          <text
+            x={18}
+            y={22}
+            fill={inkSecondary}
+            fontSize={10.5 * theme.fontScale}
+            style={{ cursor: 'text' }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onEditField('legend', 'Legend (Up)', config.legendLabels?.['lol_up'] ?? 'Activated', 'lol_up');
+            }}
+          >
+            {config.legendLabels?.['lol_up'] ?? 'Activated'}
           </text>
           <circle cx={6} cy={38} r={5} fill={palette.downColor} />
-          <text x={18} y={42} fill={inkSecondary} fontSize={10.5 * theme.fontScale}>
-            Suppressed
+          <text
+            x={18}
+            y={42}
+            fill={inkSecondary}
+            fontSize={10.5 * theme.fontScale}
+            style={{ cursor: 'text' }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onEditField('legend', 'Legend (Down)', config.legendLabels?.['lol_down'] ?? 'Suppressed', 'lol_down');
+            }}
+          >
+            {config.legendLabels?.['lol_down'] ?? 'Suppressed'}
           </text>
 
-          <text x={0} y={82} fill={inkPrimary} fontSize={11 * theme.fontScale} fontWeight={700}>
-            Gene Count
+          <text
+            x={0}
+            y={82}
+            fill={inkPrimary}
+            fontSize={11 * theme.fontScale}
+            fontWeight={700}
+            style={{ cursor: 'text' }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onEditField('legend', 'Size Legend Title', config.legendLabels?.['lol_size'] ?? 'Gene Count', 'lol_size');
+            }}
+          >
+            {config.legendLabels?.['lol_size'] ?? 'Gene Count'}
           </text>
           {[50, 100, 150].map((cnt, i) => {
             const rad = 4.5 + Math.sqrt(Math.min(cnt, maxCount) / maxCount) * 7.5;

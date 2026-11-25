@@ -5,7 +5,7 @@ import type {
   StatsConfig,
   TidyStatRow,
 } from '../../types/biograce';
-import type { EditablePlotField } from '../ui/InlinePlotEditor';
+import type { OnEditPlotField } from '../ui/InlinePlotEditor';
 import { resolvePlotTheme } from '../../lib/palettes';
 import { computeBeeswarmOffsets, computeKDE, formatPValue } from '../../lib/statsEngine';
 import { APPLE_SPRINGS } from '../../motion/applePhysics';
@@ -16,7 +16,7 @@ interface AntiBarplotCanvasProps {
   config: StatsConfig;
   darkMode: boolean;
   svgRef: React.RefObject<SVGSVGElement | null>;
-  onEditField: (field: EditablePlotField, label: string, currentValue: string) => void;
+  onEditField: OnEditPlotField;
 }
 
 const WIDTH = 840;
@@ -372,8 +372,14 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
                 fill={inkPrimary}
                 fontSize={baseFs + 0.3}
                 fontWeight={600}
+                style={{ cursor: 'text' }}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  const lbl = config.legendLabels?.[`grp_${g.group}`] ?? g.group;
+                  onEditField('legend', `Group Label (${g.group})`, lbl, `grp_${g.group}`);
+                }}
               >
-                {g.group}
+                {config.legendLabels?.[`grp_${g.group}`] ?? g.group}
               </text>
               <text
                 x={cx}

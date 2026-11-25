@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { DEPlotConfig, VolcanoRow } from '../../types/biograce';
-import type { EditablePlotField } from '../ui/InlinePlotEditor';
+import type { OnEditPlotField } from '../ui/InlinePlotEditor';
 import { resolvePlotTheme } from '../../lib/palettes';
 import { APPLE_SPRINGS, playAppleTick } from '../../motion/applePhysics';
 
@@ -14,7 +14,7 @@ interface VolcanoMAPlotProps {
   svgRef: React.RefObject<SVGSVGElement | null>;
   onToggleLabel: (gene: string) => void;
   onMoveLabel: (gene: string, dx: number, dy: number) => void;
-  onEditField: (field: EditablePlotField, label: string, currentValue: string) => void;
+  onEditField: OnEditPlotField;
 }
 
 const WIDTH = 840;
@@ -246,19 +246,48 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
             `|log2FC| ≥ ${config.fcThreshold.toFixed(1)}, FDR ≤ ${config.fdrThreshold}`}
         </text>
 
-        {/* Legend */}
+        {/* Legend (Click any legend label to edit inline) */}
         <g transform={`translate(${WIDTH - MARGIN.right - 256}, 22)`} fontSize={Math.max(10, baseFs - 1)}>
           <circle cx={6} cy={0} r={4.5} fill={palette.upColor} />
-          <text x={15} y={4} fill={inkPrimary} fontWeight={600}>
-            Up ({upCount})
+          <text
+            x={15}
+            y={4}
+            fill={inkPrimary}
+            fontWeight={600}
+            style={{ cursor: 'text' }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onEditField('legend', 'Legend (Up)', config.legendLabels?.['volcano_up'] ?? `Up (${upCount})`, 'volcano_up');
+            }}
+          >
+            {config.legendLabels?.['volcano_up'] ?? `Up (${upCount})`}
           </text>
           <circle cx={90} cy={0} r={4.5} fill={palette.downColor} />
-          <text x={99} y={4} fill={inkPrimary} fontWeight={600}>
-            Down ({downCount})
+          <text
+            x={99}
+            y={4}
+            fill={inkPrimary}
+            fontWeight={600}
+            style={{ cursor: 'text' }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onEditField('legend', 'Legend (Down)', config.legendLabels?.['volcano_down'] ?? `Down (${downCount})`, 'volcano_down');
+            }}
+          >
+            {config.legendLabels?.['volcano_down'] ?? `Down (${downCount})`}
           </text>
           <circle cx={185} cy={0} r={4} fill={palette.nsColor} />
-          <text x={194} y={4} fill={inkSecondary}>
-            NS ({nsCount})
+          <text
+            x={194}
+            y={4}
+            fill={inkSecondary}
+            style={{ cursor: 'text' }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onEditField('legend', 'Legend (NS)', config.legendLabels?.['volcano_ns'] ?? `NS (${nsCount})`, 'volcano_ns');
+            }}
+          >
+            {config.legendLabels?.['volcano_ns'] ?? `NS (${nsCount})`}
           </text>
         </g>
 

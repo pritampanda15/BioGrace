@@ -3,23 +3,31 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Pencil, X } from 'lucide-react';
 import { APPLE_SPRINGS } from '../../motion/applePhysics';
 
-export type EditablePlotField = 'title' | 'subtitle' | 'xLabel' | 'yLabel';
+export type EditablePlotField = 'title' | 'subtitle' | 'xLabel' | 'yLabel' | 'legend';
 
 export interface ActivePlotEdit {
   field: EditablePlotField;
   label: string;
   value: string;
+  legendKey?: string;
 }
+
+export type OnEditPlotField = (
+  field: EditablePlotField,
+  label: string,
+  currentValue: string,
+  legendKey?: string
+) => void;
 
 interface InlinePlotEditorProps {
   activeEdit: ActivePlotEdit | null;
-  onCommit: (field: EditablePlotField, nextValue: string) => void;
+  onCommit: (field: EditablePlotField, nextValue: string, legendKey?: string) => void;
   onClose: () => void;
 }
 
 /**
  * Floating Apple Glass Inline Plot Text Editor.
- * Appears directly over the figure when the user clicks any Title, Subtitle, X-axis, or Y-axis label.
+ * Appears directly over the figure when the user clicks any Title, Subtitle, X-axis, Y-axis, or Legend label.
  */
 export const InlinePlotEditor: React.FC<InlinePlotEditorProps> = ({
   activeEdit,
@@ -41,7 +49,7 @@ export const InlinePlotEditor: React.FC<InlinePlotEditorProps> = ({
 
   const commit = () => {
     if (!activeEdit) return;
-    onCommit(activeEdit.field, draft);
+    onCommit(activeEdit.field, draft, activeEdit.legendKey);
     onClose();
   };
 
@@ -61,7 +69,7 @@ export const InlinePlotEditor: React.FC<InlinePlotEditorProps> = ({
               Editing {activeEdit.label}
             </span>
             <span className="text-[10px] text-[var(--text-tertiary)]">
-              Enter to save · Leave blank to hide · Esc to cancel
+              Enter to save · Esc to cancel
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -71,7 +79,7 @@ export const InlinePlotEditor: React.FC<InlinePlotEditorProps> = ({
               value={draft}
               onChange={(e) => {
                 setDraft(e.target.value);
-                onCommit(activeEdit.field, e.target.value);
+                onCommit(activeEdit.field, e.target.value, activeEdit.legendKey);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') commit();

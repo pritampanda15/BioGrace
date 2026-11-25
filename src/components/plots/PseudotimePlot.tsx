@@ -1,7 +1,7 @@
 import React from 'react';
 import type { DEPlotConfig } from '../../types/biograce';
 import type { PseudotimeGeneSeries } from '../../lib/advancedDemoData';
-import type { EditablePlotField } from '../ui/InlinePlotEditor';
+import type { OnEditPlotField } from '../ui/InlinePlotEditor';
 import { resolvePlotTheme } from '../../lib/palettes';
 
 interface PseudotimePlotProps {
@@ -10,7 +10,7 @@ interface PseudotimePlotProps {
   config: DEPlotConfig;
   darkMode: boolean;
   svgRef: React.RefObject<SVGSVGElement | null>;
-  onEditField: (field: EditablePlotField, label: string, currentValue: string) => void;
+  onEditField: OnEditPlotField;
 }
 
 const WIDTH = 840;
@@ -192,15 +192,44 @@ export const PseudotimePlot: React.FC<PseudotimePlotProps> = ({
           {config.yLabel || 'Normalized Expression (log1p)'}
         </text>
 
-        {/* Legend */}
+        {/* Legend (Click to edit inline) */}
         <g transform={`translate(${WIDTH - MARGIN.right + 18}, ${MARGIN.top + 12})`}>
-          <text x={0} y={0} fill={inkPrimary} fontSize={11 * theme.fontScale} fontWeight={700}>Marker Genes</text>
-          {series.map((s, i) => (
-            <g key={s.gene} transform={`translate(0, ${22 + i * 24})`}>
-              <line x1={0} x2={16} y1={-3} y2={-3} stroke={palette.colors[i % palette.colors.length]} strokeWidth={3} strokeLinecap="round" />
-              <text x={22} y={1} fill={inkPrimary} fontSize={10.5 * theme.fontScale} fontWeight={500}>{s.gene}</text>
-            </g>
-          ))}
+          <text
+            x={0}
+            y={0}
+            fill={inkPrimary}
+            fontSize={11 * theme.fontScale}
+            fontWeight={700}
+            style={{ cursor: 'text' }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onEditField('legend', 'Legend Title', config.legendLabels?.['pt_title'] ?? 'Marker Genes', 'pt_title');
+            }}
+          >
+            {config.legendLabels?.['pt_title'] ?? 'Marker Genes'}
+          </text>
+          {series.map((s, i) => {
+            const lbl = config.legendLabels?.[`pt_${s.gene}`] ?? s.gene;
+            return (
+              <g key={s.gene} transform={`translate(0, ${22 + i * 24})`}>
+                <line x1={0} x2={16} y1={-3} y2={-3} stroke={palette.colors[i % palette.colors.length]} strokeWidth={3} strokeLinecap="round" />
+                <text
+                  x={22}
+                  y={1}
+                  fill={inkPrimary}
+                  fontSize={10.5 * theme.fontScale}
+                  fontWeight={500}
+                  style={{ cursor: 'text' }}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    onEditField('legend', `Legend (${s.gene})`, lbl, `pt_${s.gene}`);
+                  }}
+                >
+                  {lbl}
+                </text>
+              </g>
+            );
+          })}
         </g>
       </svg>
     </div>
