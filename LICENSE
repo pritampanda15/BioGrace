@@ -1,0 +1,42 @@
+BioGrace Academic & Non-Commercial Research License (v1.0)
+
+Copyright (c) 2026 Pritam Panda (https://github.com/pritampanda15/BioGrace)
+All rights reserved.
+
+1. GRANT OF ACADEMIC & NON-COMMERCIAL LICENSE
+Permission is hereby granted, free of charge, to any individual, university,
+non-profit research institute, or educational institution ("Licensee") to use,
+copy, modify, and distribute this software and its associated documentation
+files (the "Software"), solely for:
+  (a) non-commercial academic or scientific research;
+  (b) teaching, classroom instruction, and educational workshops; and
+  (c) preparation of figures, analyses, and reproducible scripts for
+      non-commercial academic publications, theses, and conference presentations,
+
+subject to the following conditions:
+  1. Attribution: The above copyright notice, this license notice, and a
+     citation or link to the BioGrace repository
+     (https://github.com/pritampanda15/BioGrace) must be retained in all copies,
+     substantial portions, or derivative works of the Software.
+  2. Non-Commercial Restriction: The Software, and any derivative works thereof,
+     may NOT be used for any commercial purpose—including, without limitation,
+     commercial pharmaceutical/biotech R&D, paid consulting, fee-for-service
+     analysis, SaaS/cloud hosting for profit, or integration into proprietary
+     commercial products—without prior express written permission and a separate
+     commercial license from the copyright holder.
+  3. No Redistribution Under Incompatible Terms: Any redistribution of modified
+     or unmodified versions for academic use must remain governed by this
+     Academic & Non-Commercial Research License.
+
+2. COMMERCIAL LICENSING INQUIRIES
+For commercial, enterprise, or proprietary licensing inquiries, please contact
+the copyright holder via GitHub: https://github.com/pritampanda15/BioGrace.
+
+3. DISCLAIMER OF WARRANTY & LIMITATION OF LIABILITY
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
