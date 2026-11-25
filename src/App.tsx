@@ -156,7 +156,22 @@ export function App() {
   const [codeTab, setCodeTab] = useState<'r' | 'python' | 'cli'>('r');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
-  const [uploadBanner, setUploadBanner] = useState<string | null>(null);
+  const [uploadBanner, setUploadBanner] = useState<{
+    kind: 'success' | 'warning';
+    title: string;
+    detail: string;
+  } | null>(null);
+  const [deUploadStatus, setDeUploadStatus] = useState<{
+    fileName: string;
+    rowCount: number;
+    isCustom: boolean;
+  }>({ fileName: 'Demo dataset', rowCount: 500, isCustom: false });
+  const [statsUploadStatus, setStatsUploadStatus] = useState<{
+    fileName: string;
+    rowCount: number;
+    isCustom: boolean;
+  }>({ fileName: 'Demo dataset', rowCount: 48, isCustom: false });
+  const toastTimerRef = useRef<number | null>(null);
   const [geneQuery, setGeneQuery] = useState('');
   const [activeCaseId, setActiveCaseId] = useState<JournalCaseId>('03-multi-volcano');
   const [caseCategoryFilter, setCaseCategoryFilter] = useState<'All' | CaseCategory>('All');
@@ -359,6 +374,7 @@ export function App() {
     setActiveStatsDemoId(found.id);
     setStatsRows(found.rows);
     setStatsSourceFile(`${found.id}.csv`);
+    setStatsUploadStatus({ fileName: found.name, rowCount: found.rows.length, isCustom: false });
     setStatsConfig((prev) => ({
       ...prev,
       title: found.name,
@@ -404,6 +420,17 @@ export function App() {
     playAppleTick(soundEnabled, 'commit');
   };
 
+  const notifyUpload = useCallback(
+    (kind: 'success' | 'warning', title: string, detail: string) => {
+      setUploadBanner({ kind, title, detail });
+      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = window.setTimeout(() => {
+        setUploadBanner(null);
+      }, 6500);
+    },
+    []
+  );
+
   const ingestCsvText = (
     text: string,
     fileName: string,
@@ -411,7 +438,11 @@ export function App() {
   ) => {
     const table = parseDelimitedText(text);
     if (table.rows.length === 0) {
-      setUploadBanner('Could not parse any rows from that file — check that it has a CSV or TSV header.');
+      notifyUpload(
+        'warning',
+        `Could not read ${fileName}`,
+        'No data rows were detected — verify the file has a valid CSV or TSV header row.'
+      );
       return;
     }
 
@@ -422,6 +453,7 @@ export function App() {
         setStudio('stats');
         setStatsRows(parsed.rows);
         setStatsSourceFile(fileName);
+        setStatsUploadStatus({ fileName, rowCount: parsed.rows.length, isCustom: true });
         setActiveStatsDemoId('custom');
         setStatsConfig((prev) => ({
           ...prev,
@@ -432,10 +464,18 @@ export function App() {
           isPaired: Boolean(parsed.subjectCol && !parsed.replicateCol),
           collapsePseudoreplicates: false,
         }));
-        setUploadBanner(
-          `Loaded ${parsed.rows.length} rows from ${fileName} (Group: ${parsed.groupCol}, Value: ${parsed.valueCol}).`
+        notifyUpload(
+          'success',
+          `CSV Uploaded: ${fileName}`,
+          `Loaded ${parsed.rows.length} rows (Group: ${parsed.groupCol}, Value: ${parsed.valueCol}).`
         );
         playAppleTick(soundEnabled, 'commit');
+      } else {
+        notifyUpload(
+          'warning',
+          `${fileName} uploaded — columns not matched`,
+          'Expected a categorical Group column and a numeric Value column. Open CSV Guide for an example.'
+        );
       }
       return;
     }
@@ -452,26 +492,29 @@ export function App() {
       else setPlotGroupTab('de');
     }
 
+    let loadedCount = 0;
+    let detailMsg = '';
+
     if (targetPlot === 'dotplot') {
       const rows = parseDotPlotRows(table);
       if (rows.length) {
         setDotPlotRows(rows);
-        setDeSourceFile(fileName);
-        setUploadBanner(`Loaded ${rows.length} marker × cluster entries from ${fileName}.`);
+        loadedCount = rows.length;
+        detailMsg = `Loaded ${rows.length} marker × cluster entries.`;
       }
     } else if (targetPlot === 'upset') {
       const items = parseUpSetRows(table);
       if (items.length) {
         setUpsetItems(items);
-        setDeSourceFile(fileName);
-        setUploadBanner(`Loaded ${items.length} set-membership items from ${fileName}.`);
+        loadedCount = items.length;
+        detailMsg = `Loaded ${items.length} set-membership items.`;
       }
     } else if (targetPlot === 'lollipop') {
       const rows = parsePathwayRows(table);
       if (rows.length) {
         setPathwayRows(rows);
-        setDeSourceFile(fileName);
-        setUploadBanner(`Loaded ${rows.length} enriched pathways from ${fileName}.`);
+        loadedCount = rows.length;
+        detailMsg = `Loaded ${rows.length} enriched pathways.`;
       }
     } else if (targetPlot === 'umap' || targetPlot === 'tsne') {
       const parsed = parseEmbeddingRows(table);
@@ -479,64 +522,64 @@ export function App() {
         setEmbeddingCells(parsed.cells);
         if (parsed.markers.length) setEmbeddingMarkers(parsed.markers);
         setEmbeddingColorBy('cluster');
-        setDeSourceFile(fileName);
-        setUploadBanner(`Loaded ${parsed.cells.length} single cells from ${fileName}.`);
+        loadedCount = parsed.cells.length;
+        detailMsg = `Loaded ${parsed.cells.length} single cells${parsed.markers.length ? ` with ${parsed.markers.length} FeaturePlot genes` : ''}.`;
       }
     } else if (targetPlot === 'pca') {
       const rows = parsePCARows(table);
       if (rows.length) {
         setPcaData((p) => ({ ...p, rows }));
-        setDeSourceFile(fileName);
-        setUploadBanner(`Loaded ${rows.length} PCA samples from ${fileName}.`);
+        loadedCount = rows.length;
+        detailMsg = `Loaded ${rows.length} PCA samples with 95% confidence ellipses.`;
       }
     } else if (targetPlot === 'heatmap') {
       const hm = parseHeatmapMatrix(table);
       if (hm) {
         setDegHeatmap(hm);
-        setDeSourceFile(fileName);
-        setUploadBanner(`Loaded ${hm.genes.length} genes × ${hm.samples.length} samples from ${fileName} (row z-scored).`);
+        loadedCount = hm.genes.length;
+        detailMsg = `Loaded ${hm.genes.length} genes × ${hm.samples.length} samples (row z-scored).`;
       }
     } else if (targetPlot === 'pseudotime') {
       const pt = parsePseudotimeRows(table);
       if (pt) {
         setPseudotime(pt);
-        setDeSourceFile(fileName);
-        setUploadBanner(`Smoothed ${pt.series.length} gene trajectories along pseudotime from ${fileName}.`);
+        loadedCount = pt.series.length;
+        detailMsg = `Smoothed ${pt.series.length} gene trajectories along pseudotime.`;
       }
     } else if (targetPlot === 'dose-response') {
       const pts = parseDoseResponseRows(table);
       if (pts.length) {
         setDosePoints(pts);
-        setDeSourceFile(fileName);
-        setUploadBanner(`Fitted 4PL dose-response curve on ${pts.length} measurements from ${fileName}.`);
+        loadedCount = pts.length;
+        detailMsg = `Fitted 4PL dose-response curve on ${pts.length} assay points.`;
       }
     } else if (targetPlot === 'survival') {
       const rows = parseSurvivalRows(table);
       if (rows.length) {
         setSurvivalRows(rows);
-        setDeSourceFile(fileName);
-        setUploadBanner(`Computed Kaplan–Meier & Log-Rank test on ${rows.length} subjects from ${fileName}.`);
+        loadedCount = rows.length;
+        detailMsg = `Computed Kaplan–Meier & Log-Rank test on ${rows.length} subjects.`;
       }
     } else if (targetPlot === 'forest') {
       const rows = parseForestRows(table);
       if (rows.length) {
         setForestRows(rows);
-        setDeSourceFile(fileName);
-        setUploadBanner(`Loaded ${rows.length} hazard/odds ratios from ${fileName}.`);
+        loadedCount = rows.length;
+        detailMsg = `Loaded ${rows.length} hazard/odds ratios.`;
       }
     } else if (targetPlot === 'roc') {
       const rows = parseROCRows(table);
       if (rows.length) {
         setRocRows(rows);
-        setDeSourceFile(fileName);
-        setUploadBanner(`Computed ROC/AUROC on ${rows.length} observations from ${fileName}.`);
+        loadedCount = rows.length;
+        detailMsg = `Computed ROC / AUROC on ${rows.length} observations.`;
       }
     } else if (targetPlot === 'correlation') {
       const rows = parsePairXYRows(table);
       if (rows.length) {
         setCorrRows(rows);
-        setDeSourceFile(fileName);
-        setUploadBanner(`Computed Pearson/Spearman & Bland–Altman on ${rows.length} pairs from ${fileName}.`);
+        loadedCount = rows.length;
+        detailMsg = `Computed Pearson/Spearman & Bland–Altman on ${rows.length} sample pairs.`;
       }
     } else {
       const parsed = parseDERows(table);
@@ -547,19 +590,29 @@ export function App() {
           .slice(0, 8)
           .map((r) => r.gene);
         setVolcanoRows(parsed.rows);
-        setDeSourceFile(fileName);
         setDeConfig((prev) => ({
           ...prev,
           title: `${fileName.replace(/\.(csv|tsv|txt)$/i, '')}`,
           labeledGenes: autoTop,
           labelOffsets: {},
         }));
-        setUploadBanner(
-          `Detected ${parsed.detectedTool} format · Loaded ${parsed.rows.length} genes from ${fileName}.`
-        );
+        loadedCount = parsed.rows.length;
+        detailMsg = `Detected ${parsed.detectedTool} format · Loaded ${parsed.rows.length} genes.`;
       }
     }
-    playAppleTick(soundEnabled, 'commit');
+
+    if (loadedCount > 0) {
+      setDeSourceFile(fileName);
+      setDeUploadStatus({ fileName, rowCount: loadedCount, isCustom: true });
+      notifyUpload('success', `CSV Uploaded: ${fileName}`, detailMsg);
+      playAppleTick(soundEnabled, 'commit');
+    } else {
+      notifyUpload(
+        'warning',
+        `${fileName} uploaded — columns did not match ${targetPlot}`,
+        `Found headers [${table.headers.slice(0, 5).join(', ')}]. Click "CSV Guide" to see required columns for this plot.`
+      );
+    }
   };
 
   const handleFileIngest = async (file: File) => {
@@ -659,6 +712,50 @@ export function App() {
           )}
         </AnimatePresence>
 
+        {/* Floating Apple Glass Upload Toast (Always Visible Regardless of Scroll Position) */}
+        <AnimatePresence>
+          {uploadBanner && (
+            <motion.div
+              initial={{ opacity: 0, y: -16, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -12, scale: 0.96 }}
+              transition={APPLE_SPRINGS.snappy}
+              className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-[min(92vw,540px)] material-sheet rounded-2xl px-4 py-3 flex items-start justify-between gap-3"
+            >
+              <div className="flex items-start gap-2.5 min-w-0">
+                <div
+                  className={`mt-0.5 p-1.5 rounded-full shrink-0 ${
+                    uploadBanner.kind === 'success'
+                      ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                  }`}
+                >
+                  {uploadBanner.kind === 'success' ? (
+                    <Check className="w-4 h-4" />
+                  ) : (
+                    <FileSpreadsheet className="w-4 h-4" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-[var(--text-primary)] truncate">
+                    {uploadBanner.title}
+                  </div>
+                  <div className="text-[11px] text-[var(--text-secondary)] mt-0.5 leading-snug">
+                    {uploadBanner.detail}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onPointerDown={() => setUploadBanner(null)}
+                className="apple-press text-[11px] font-semibold text-[var(--text-tertiary)] hover:text-[var(--text-primary)] shrink-0"
+              >
+                Dismiss
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Floating Apple Translucent Toolbar */}
         <header className="sticky top-0 z-30 material-toolbar">
           <div className="max-w-[1460px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
@@ -739,10 +836,22 @@ export function App() {
               <button
                 type="button"
                 onPointerDown={() => fileInputRef.current?.click()}
-                className="apple-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-primary)]"
+                className={`apple-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium ${
+                  (studio === 'stats' ? statsUploadStatus.isCustom : deUploadStatus.isCustom) && studio !== 'gallery'
+                    ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/35'
+                    : 'bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-primary)]'
+                }`}
               >
-                <Upload className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Upload CSV</span>
+                {(studio === 'stats' ? statsUploadStatus.isCustom : deUploadStatus.isCustom) && studio !== 'gallery' ? (
+                  <Check className="w-3.5 h-3.5" />
+                ) : (
+                  <Upload className="w-3.5 h-3.5" />
+                )}
+                <span className="hidden sm:inline max-w-[140px] truncate">
+                  {(studio === 'stats' ? statsUploadStatus.isCustom : deUploadStatus.isCustom) && studio !== 'gallery'
+                    ? (studio === 'stats' ? statsUploadStatus.fileName : deUploadStatus.fileName)
+                    : 'Upload CSV'}
+                </span>
               </button>
 
               <button
@@ -1484,29 +1593,28 @@ export function App() {
 
           {/* MAIN STAGE */}
           <section className="space-y-5 min-w-0">
-            <AnimatePresence>
-              {uploadBanner && (
-                <motion.div
-                  initial={{ opacity: 0, y: -8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={APPLE_SPRINGS.criticallyDamped}
-                  className="rounded-2xl px-4 py-2.5 bg-emerald-500/12 border border-emerald-500/30 flex items-center justify-between gap-3 text-xs"
-                >
-                  <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300 font-medium">
-                    <FileSpreadsheet className="w-4 h-4 shrink-0" />
-                    <span>{uploadBanner}</span>
+            {/* Persistent Uploaded File Status Strip (Shows clearly whenever a custom CSV is active) */}
+            {(() => {
+              const activeUpload = studio === 'stats' ? statsUploadStatus : deUploadStatus;
+              if (studio === 'gallery' || !activeUpload.isCustom) return null;
+              return (
+                <div className="rounded-2xl px-4 py-2.5 bg-emerald-500/12 border border-emerald-500/30 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300 font-semibold min-w-0">
+                    <Check className="w-4 h-4 shrink-0" />
+                    <span className="truncate">
+                      CSV Uploaded: <code className="font-mono">{activeUpload.fileName}</code> ({activeUpload.rowCount} items active)
+                    </span>
                   </div>
                   <button
                     type="button"
-                    onPointerDown={() => setUploadBanner(null)}
-                    className="text-[11px] font-semibold opacity-70 hover:opacity-100"
+                    onPointerDown={() => fileInputRef.current?.click()}
+                    className="apple-press text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-700 dark:text-emerald-300"
                   >
-                    Dismiss
+                    Replace CSV
                   </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                </div>
+              );
+            })()}
 
             {/* Quick Stage Action Bar */}
             <div className="flex flex-wrap items-center justify-between gap-3">
