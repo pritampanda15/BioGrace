@@ -630,7 +630,7 @@ export function App() {
         {/* Main Workbench */}
         <main className="flex-1 max-w-[1460px] w-full mx-auto px-4 sm:px-6 py-5 grid grid-cols-1 lg:grid-cols-[356px_minmax(0,1fr)] gap-6 items-start">
           {/* LEFT INSPECTOR SIDEBAR */}
-          <aside className="material-sidebar rounded-3xl border p-5 space-y-5 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6.2rem)] lg:overflow-y-auto scroll-mask-y">
+          <aside className="material-sidebar rounded-3xl border p-5 space-y-5 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6.2rem)] lg:overflow-y-auto">
             {studio === 'gallery' ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -666,7 +666,7 @@ export function App() {
                     </button>
                   ))}
                 </div>
-                <div className="space-y-1.5 max-h-[310px] overflow-y-auto pr-1 scroll-mask-y">
+                <div className="space-y-1.5 max-h-[320px] overflow-y-auto p-1.5 rounded-2xl bg-[var(--bg-subtle)]/45 border border-[var(--border-hairline)]">
                   {filteredCases.map((item) => {
                     const active = item.id === activeCase.id;
                     return (
