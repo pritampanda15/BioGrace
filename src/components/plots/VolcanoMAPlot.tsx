@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { DEPlotConfig, VolcanoRow } from '../../types/biograce';
-import { JOURNAL_PRESETS } from '../../lib/palettes';
+import { resolvePlotTheme } from '../../lib/palettes';
 import { APPLE_SPRINGS, playAppleTick } from '../../motion/applePhysics';
 
 interface VolcanoMAPlotProps {
@@ -29,7 +29,8 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
   onToggleLabel,
   onMoveLabel,
 }) => {
-  const preset = JOURNAL_PRESETS[config.preset];
+  const theme = resolvePlotTheme(config);
+  const { palette } = theme;
   const [hovered, setHovered] = useState<{
     row: VolcanoRow;
     sx: number;
@@ -47,10 +48,15 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
   } | null>(null);
 
   const paperBg = config.paperExport || !darkMode;
-  const bgFill = paperBg ? '#FFFFFF' : '#13141A';
-  const inkPrimary = paperBg ? '#1D1D1F' : '#F5F5F7';
+  const bgFill = theme.transparentBg ? 'none' : paperBg ? '#FFFFFF' : '#13141A';
+  const strokeHalo = paperBg ? '#FFFFFF' : '#13141A';
+  const inkPrimary = paperBg ? '#111827' : '#F5F5F7';
+  const inkAxis = paperBg ? '#1F2937' : '#E5E7EB';
   const inkSecondary = paperBg ? '#515154' : '#A1A1AA';
   const gridColor = paperBg ? '#CBD5E1' : '#334155';
+
+  const baseFs = 12 * theme.fontScale;
+  const tickLen = theme.tickDirection === 'in' ? -5.5 : 5.5;
 
   const plotW = WIDTH - MARGIN.left - MARGIN.right;
   const plotH = HEIGHT - MARGIN.top - MARGIN.bottom;
@@ -106,7 +112,6 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
       return { row: r, status, sx, sy, nlp, lm };
     });
 
-    // Render NS behind significant points so landmarks always stay crisp on top
     mapped.sort((a, b) => (a.status === 'ns' ? -1 : 1) - (b.status === 'ns' ? -1 : 1));
 
     return {
@@ -134,7 +139,10 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
   const yTicks = useMemo(() => {
     const count = 6;
     const rawStep = (yMax - yMin) / count;
-    const step = mode === 'volcano' ? Math.max(1, Math.round(rawStep / 5) * 5 || Math.ceil(rawStep)) : Math.max(1, Math.round(rawStep));
+    const step =
+      mode === 'volcano'
+        ? Math.max(1, Math.round(rawStep / 5) * 5 || Math.ceil(rawStep))
+        : Math.max(1, Math.round(rawStep));
     const ticks: number[] = [];
     for (let t = Math.ceil(yMin / step) * step; t <= yMax; t += step) ticks.push(t);
     return ticks;
@@ -143,7 +151,6 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
   const labeledSet = useMemo(() => new Set(config.labeledGenes), [config.labeledGenes]);
   const labeledPoints = useMemo(() => {
     const hits = points.filter((p) => labeledSet.has(p.row.gene));
-    // Deterministic slight radial stagger if no manual drag offset exists yet
     return hits.map((pt, idx) => {
       const saved = config.labelOffsets[pt.row.gene];
       const defaultDx = pt.row.log2FC >= 0 ? 18 + (idx % 3) * 10 : -18 - (idx % 3) * 10;
@@ -161,8 +168,6 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
     const svg = svgRef.current;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
-    const scaleX = WIDTH / rect.width;
-    const scaleY = HEIGHT / rect.height;
     e.currentTarget.setPointerCapture(e.pointerId);
     dragStateRef.current = {
       gene,
@@ -170,8 +175,8 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
       startClientY: e.clientY,
       origDx: dx,
       origDy: dy,
-      scaleX,
-      scaleY,
+      scaleX: WIDTH / rect.width,
+      scaleY: HEIGHT / rect.height,
     };
   };
 
@@ -199,7 +204,7 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
         ref={svgRef}
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="w-full h-auto rounded-2xl overflow-visible"
-        style={{ fontFamily: preset.fontFamily }}
+        style={{ fontFamily: theme.fontFamilyCss }}
         xmlns="http://www.w3.org/2000/svg"
       >
         <rect x={0} y={0} width={WIDTH} height={HEIGHT} rx={16} fill={bgFill} />
@@ -209,28 +214,28 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
           x={MARGIN.left}
           y={28}
           fill={inkPrimary}
-          fontSize={config.fontSize + 4}
+          fontSize={baseFs + 3.5}
           fontWeight={700}
-          letterSpacing="-0.02em"
+          letterSpacing="-0.015em"
         >
           {config.title}
         </text>
-        <text x={MARGIN.left} y={45} fill={inkSecondary} fontSize={config.fontSize - 1}>
+        <text x={MARGIN.left} y={45} fill={inkSecondary} fontSize={baseFs - 1}>
           {config.subtitle ||
-            `${mode === 'volcano' ? 'Volcano' : 'MA'} · |log2FC| ≥ ${config.fcThreshold.toFixed(1)}, FDR ≤ ${config.fdrThreshold}`}
+            `${theme.journal.shortName} · ${theme.widthMm} mm · |log2FC| ≥ ${config.fcThreshold.toFixed(1)}, FDR ≤ ${config.fdrThreshold}`}
         </text>
 
-        {/* Legend Pills (Right Top, embedded in vector SVG) */}
-        <g transform={`translate(${WIDTH - MARGIN.right - 256}, 22)`} fontSize={11}>
-          <circle cx={6} cy={0} r={4.5} fill={preset.upColor} />
+        {/* Legend */}
+        <g transform={`translate(${WIDTH - MARGIN.right - 256}, 22)`} fontSize={Math.max(10, baseFs - 1)}>
+          <circle cx={6} cy={0} r={4.5} fill={palette.upColor} />
           <text x={15} y={4} fill={inkPrimary} fontWeight={600}>
             Up ({upCount})
           </text>
-          <circle cx={90} cy={0} r={4.5} fill={preset.downColor} />
+          <circle cx={90} cy={0} r={4.5} fill={palette.downColor} />
           <text x={99} y={4} fill={inkPrimary} fontWeight={600}>
             Down ({downCount})
           </text>
-          <circle cx={185} cy={0} r={4} fill={preset.nsColor} />
+          <circle cx={185} cy={0} r={4} fill={palette.nsColor} />
           <text x={194} y={4} fill={inkSecondary}>
             NS ({nsCount})
           </text>
@@ -238,7 +243,7 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
 
         {/* Subtle Grid */}
         {config.showGrid && (
-          <g stroke={gridColor} strokeOpacity={preset.gridOpacity} strokeWidth={1}>
+          <g stroke={gridColor} strokeOpacity={0.35} strokeDasharray="3 3" strokeWidth={0.7}>
             {xTicks.map((t) => (
               <line key={`gx-${t}`} x1={toX(t)} x2={toX(t)} y1={MARGIN.top} y2={MARGIN.top + plotH} />
             ))}
@@ -250,7 +255,7 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
 
         {/* Animated Threshold Lines */}
         {config.showThresholds && mode === 'volcano' && (
-          <g stroke={inkSecondary} strokeOpacity={0.5} strokeDasharray="5 4" strokeWidth={1.15}>
+          <g stroke={inkSecondary} strokeOpacity={0.55} strokeDasharray="5 4" strokeWidth={theme.lineWidth}>
             <motion.line
               animate={{ x1: toX(config.fcThreshold), x2: toX(config.fcThreshold) }}
               transition={APPLE_SPRINGS.criticallyDamped}
@@ -275,8 +280,15 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
         )}
 
         {config.showThresholds && mode === 'ma' && (
-          <g stroke={inkSecondary} strokeOpacity={0.5} strokeDasharray="5 4" strokeWidth={1.15}>
-            <line x1={MARGIN.left} x2={MARGIN.left + plotW} y1={toY(0)} y2={toY(0)} strokeDasharray="none" strokeOpacity={0.35} />
+          <g stroke={inkSecondary} strokeOpacity={0.55} strokeDasharray="5 4" strokeWidth={theme.lineWidth}>
+            <line
+              x1={MARGIN.left}
+              x2={MARGIN.left + plotW}
+              y1={toY(0)}
+              y2={toY(0)}
+              strokeDasharray="none"
+              strokeOpacity={0.35}
+            />
             <motion.line
               x1={MARGIN.left}
               x2={MARGIN.left + plotW}
@@ -292,26 +304,66 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
           </g>
         )}
 
-        {/* Axes */}
-        <g stroke={inkPrimary} strokeWidth={preset.axisWidth}>
+        {/* Journal-Specific Spines (Open L-frame vs 4-Spine Boxed ACS/BiophysJ/xmgrace) */}
+        <g stroke={inkAxis} strokeWidth={theme.axesLinewidth}>
           <line x1={MARGIN.left} x2={MARGIN.left + plotW} y1={MARGIN.top + plotH} y2={MARGIN.top + plotH} />
           <line x1={MARGIN.left} x2={MARGIN.left} y1={MARGIN.top} y2={MARGIN.top + plotH} />
+          {theme.topRightSpines && (
+            <>
+              <line x1={MARGIN.left} x2={MARGIN.left + plotW} y1={MARGIN.top} y2={MARGIN.top} />
+              <line x1={MARGIN.left + plotW} x2={MARGIN.left + plotW} y1={MARGIN.top} y2={MARGIN.top + plotH} />
+            </>
+          )}
         </g>
 
-        {/* Axis Ticks & Labels */}
-        <g fill={inkSecondary} fontSize={config.fontSize - 1}>
+        {/* Journal-Specific Ticks (Inward vs Outward + Optional Top/Right Mirror Ticks) */}
+        <g fill={inkSecondary} fontSize={baseFs - 1}>
           {xTicks.map((t) => (
-            <g key={`xt-${t}`} transform={`translate(${toX(t)}, ${MARGIN.top + plotH})`}>
-              <line y2={5} stroke={inkPrimary} strokeWidth={preset.axisWidth} />
-              <text y={20} textAnchor="middle">
+            <g key={`xt-${t}`}>
+              <line
+                x1={toX(t)}
+                x2={toX(t)}
+                y1={MARGIN.top + plotH}
+                y2={MARGIN.top + plotH + tickLen}
+                stroke={inkAxis}
+                strokeWidth={theme.axesLinewidth}
+              />
+              {theme.tickTopRight && (
+                <line
+                  x1={toX(t)}
+                  x2={toX(t)}
+                  y1={MARGIN.top}
+                  y2={MARGIN.top - tickLen}
+                  stroke={inkAxis}
+                  strokeWidth={theme.axesLinewidth}
+                />
+              )}
+              <text x={toX(t)} y={MARGIN.top + plotH + 20} textAnchor="middle">
                 {t}
               </text>
             </g>
           ))}
           {yTicks.map((t) => (
-            <g key={`yt-${t}`} transform={`translate(${MARGIN.left}, ${toY(t)})`}>
-              <line x2={-5} stroke={inkPrimary} strokeWidth={preset.axisWidth} />
-              <text x={-10} y={4} textAnchor="end">
+            <g key={`yt-${t}`}>
+              <line
+                x1={MARGIN.left}
+                x2={MARGIN.left - tickLen}
+                y1={toY(t)}
+                y2={toY(t)}
+                stroke={inkAxis}
+                strokeWidth={theme.axesLinewidth}
+              />
+              {theme.tickTopRight && (
+                <line
+                  x1={MARGIN.left + plotW}
+                  x2={MARGIN.left + plotW + tickLen}
+                  y1={toY(t)}
+                  y2={toY(t)}
+                  stroke={inkAxis}
+                  strokeWidth={theme.axesLinewidth}
+                />
+              )}
+              <text x={MARGIN.left - 11} y={toY(t) + 4} textAnchor="end">
                 {t}
               </text>
             </g>
@@ -323,7 +375,7 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
           y={HEIGHT - 16}
           textAnchor="middle"
           fill={inkPrimary}
-          fontSize={config.fontSize + 1}
+          fontSize={baseFs + 0.5}
           fontWeight={600}
         >
           {mode === 'volcano' ? 'log2 Fold Change' : 'log10 Mean Expression (baseMean)'}
@@ -332,7 +384,7 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
           transform={`translate(22, ${MARGIN.top + plotH / 2}) rotate(-90)`}
           textAnchor="middle"
           fill={inkPrimary}
-          fontSize={config.fontSize + 1}
+          fontSize={baseFs + 0.5}
           fontWeight={600}
         >
           {mode === 'volcano' ? '−log10 Adjusted P-value (FDR)' : 'log2 Fold Change'}
@@ -344,11 +396,15 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
             const isLabeled = labeledSet.has(pt.row.gene);
             const fill =
               pt.status === 'up'
-                ? preset.upColor
+                ? palette.upColor
                 : pt.status === 'down'
-                ? preset.downColor
-                : preset.nsColor;
-            const r = isLabeled ? config.pointSize + 1.8 : pt.status === 'ns' ? config.pointSize * 0.85 : config.pointSize;
+                ? palette.downColor
+                : palette.nsColor;
+            const r = isLabeled
+              ? config.pointSize + 1.8
+              : pt.status === 'ns'
+              ? config.pointSize * 0.85
+              : config.pointSize;
             return (
               <circle
                 key={pt.row.gene}
@@ -372,7 +428,7 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
           })}
         </g>
 
-        {/* Draggable Gene Callout Labels (1:1 Direct Manipulation) */}
+        {/* Draggable Gene Callout Labels */}
         <g>
           {labeledPoints.map((lp) => {
             const lx = Math.max(MARGIN.left + 8, Math.min(WIDTH - MARGIN.right - 8, lp.sx + lp.dx));
@@ -400,10 +456,10 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
                   y={ly + 3.5}
                   textAnchor={anchor}
                   fill={inkPrimary}
-                  fontSize={config.fontSize - 0.5}
+                  fontSize={baseFs - 0.5}
                   fontWeight={700}
                   paintOrder="stroke"
-                  stroke={bgFill}
+                  stroke={strokeHalo}
                   strokeWidth={3.5}
                   strokeLinejoin="round"
                 >
@@ -415,7 +471,6 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
         </g>
       </svg>
 
-      {/* Floating Glass Hover Callout (not exported in SVG) */}
       {hovered && (
         <div
           className="pointer-events-none absolute z-20 rounded-xl px-3 py-2 text-xs material-sheet"

@@ -6,27 +6,97 @@ export type StatsPlotType = 'raincloud' | 'box-beeswarm' | 'paired-slope' | 'bar
 
 export type JournalPresetId =
   | 'nature'
-  | 'cell'
   | 'science'
+  | 'cell'
+  | 'acs'
+  | 'biophysj'
+  | 'pnas'
+  | 'grace';
+
+export type PaletteId =
   | 'okabe-ito'
+  | 'nature-npg'
+  | 'acs-classic'
+  | 'tol-bright'
+  | 'tol-muted'
+  | 'viridis-discrete'
+  | 'grayscale-pub';
+
+export type ColormapId =
+  | 'RdYlBu_r'
   | 'viridis'
-  | 'tol-muted';
+  | 'plasma'
+  | 'inferno'
+  | 'magma'
+  | 'cividis'
+  | 'coolwarm'
+  | 'Spectral_r'
+  | 'turbo'
+  | 'Blues'
+  | 'YlGnBu'
+  | 'cubehelix_r';
+
+export type FontFamilyChoice = 'sans-serif' | 'serif' | 'monospace';
+
+export type ColumnWidthChoice = 'single' | 'one_half' | 'double';
 
 export interface JournalPreset {
   id: JournalPresetId;
   name: string;
+  shortName: string;
+  description: string;
+  widthsMm: {
+    single: number;
+    one_half: number;
+    double: number;
+  };
+  fontFamily: FontFamilyChoice;
+  fontSize: number;
+  titleSize: number;
+  labelSize: number;
+  tickSize: number;
+  legendSize: number;
+  lineWidth: number;
+  axesLinewidth: number;
+  tickDirection: 'out' | 'in';
+  topRightSpines: boolean;
+  tickTopRight: boolean;
+  defaultPalette: PaletteId;
+  defaultPanelLabels: 'lowercase' | 'uppercase' | 'parens_lower' | 'parens_upper';
+}
+
+export interface ColorPaletteSpec {
+  id: PaletteId;
+  name: string;
   subtitle: string;
-  colorblindSafe: boolean;
-  fontFamily: string;
+  colors: string[];
   upColor: string;
   downColor: string;
   nsColor: string;
   accentColor: string;
-  categorical: string[];
-  sequential: string[];
-  diverging: [string, string, string];
-  axisWidth: number;
-  gridOpacity: number;
+}
+
+export interface ColormapSpec {
+  id: ColormapId;
+  name: string;
+  stops: string[];
+}
+
+export interface ResolvedPlotTheme {
+  journal: JournalPreset;
+  palette: ColorPaletteSpec;
+  colormap: ColormapSpec;
+  fontFamilyCss: string;
+  fontFamilyKey: FontFamilyChoice;
+  fontScale: number;
+  lineWidth: number;
+  axesLinewidth: number;
+  tickDirection: 'out' | 'in';
+  topRightSpines: boolean;
+  tickTopRight: boolean;
+  transparentBg: boolean;
+  widthMm: number;
+  dpi: number;
 }
 
 export interface VolcanoRow {
@@ -62,9 +132,21 @@ export interface LabelOffset {
   dy: number;
 }
 
-export interface DEPlotConfig {
-  plotType: DEPlotType;
+export interface PublicationStyleSettings {
   preset: JournalPresetId;
+  palette: PaletteId;
+  colormap: ColormapId;
+  fontFamily: FontFamilyChoice;
+  fontSizePt: number;
+  lineWidth: number;
+  columnWidth: ColumnWidthChoice;
+  dpi: 300 | 600 | 1200;
+  transparentBg: boolean;
+  paperExport: boolean;
+}
+
+export interface DEPlotConfig extends PublicationStyleSettings {
+  plotType: DEPlotType;
   title: string;
   subtitle: string;
   fcThreshold: number;
@@ -76,7 +158,6 @@ export interface DEPlotConfig {
   labelOffsets: Record<string, LabelOffset>;
   showThresholds: boolean;
   showGrid: boolean;
-  paperExport: boolean;
   topAutoLabelCount: number;
 }
 
@@ -164,9 +245,8 @@ export interface StatisticalRecommendation {
   groups: GroupSummary[];
 }
 
-export interface StatsConfig {
+export interface StatsConfig extends PublicationStyleSettings {
   plotType: StatsPlotType;
-  preset: JournalPresetId;
   title: string;
   yLabel: string;
   xLabel: string;
@@ -177,5 +257,4 @@ export interface StatsConfig {
   showSignificanceBrackets: boolean;
   showMeanDiamond: boolean;
   showRawPoints: boolean;
-  paperExport: boolean;
 }

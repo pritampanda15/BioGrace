@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { DEPlotConfig, PathwayRow } from '../../types/biograce';
-import { JOURNAL_PRESETS } from '../../lib/palettes';
+import { resolvePlotTheme } from '../../lib/palettes';
 import { APPLE_SPRINGS } from '../../motion/applePhysics';
 
 interface PathwayLollipopPlotProps {
@@ -31,19 +31,21 @@ export const PathwayLollipopPlot: React.FC<PathwayLollipopPlotProps> = ({
   darkMode,
   svgRef,
 }) => {
-  const preset = JOURNAL_PRESETS[config.preset];
+  const theme = resolvePlotTheme(config);
+  const { palette } = theme;
   const [hovered, setHovered] = useState<PathwayRow | null>(null);
 
   const paperBg = config.paperExport || !darkMode;
-  const bgFill = paperBg ? '#FFFFFF' : '#13141A';
-  const inkPrimary = paperBg ? '#1D1D1F' : '#F5F5F7';
+  const bgFill = theme.transparentBg ? 'none' : paperBg ? '#FFFFFF' : '#13141A';
+  const strokeHalo = paperBg ? '#FFFFFF' : '#13141A';
+  const inkPrimary = paperBg ? '#111827' : '#F5F5F7';
+  const inkAxis = paperBg ? '#1F2937' : '#E5E7EB';
   const inkSecondary = paperBg ? '#515154' : '#A1A1AA';
   const gridColor = paperBg ? '#CBD5E1' : '#334155';
+  const baseFs = 12 * theme.fontScale;
+  const tickLen = theme.tickDirection === 'in' ? -5 : 5;
 
-  const sorted = useMemo(
-    () => [...rows].sort((a, b) => b.nes - a.nes).slice(0, 14),
-    [rows]
-  );
+  const sorted = useMemo(() => [...rows].sort((a, b) => b.nes - a.nes).slice(0, 14), [rows]);
 
   const plotW = WIDTH - MARGIN.left - MARGIN.right;
   const plotH = HEIGHT - MARGIN.top - MARGIN.bottom;
@@ -61,7 +63,7 @@ export const PathwayLollipopPlot: React.FC<PathwayLollipopPlotProps> = ({
         ref={svgRef}
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="w-full h-auto rounded-2xl"
-        style={{ fontFamily: preset.fontFamily }}
+        style={{ fontFamily: theme.fontFamilyCss }}
         xmlns="http://www.w3.org/2000/svg"
       >
         <rect x={0} y={0} width={WIDTH} height={HEIGHT} rx={16} fill={bgFill} />
@@ -70,19 +72,20 @@ export const PathwayLollipopPlot: React.FC<PathwayLollipopPlotProps> = ({
           x={32}
           y={28}
           fill={inkPrimary}
-          fontSize={config.fontSize + 4}
+          fontSize={baseFs + 3.5}
           fontWeight={700}
-          letterSpacing="-0.02em"
+          letterSpacing="-0.015em"
         >
           {config.title || 'Ranked Pathway Enrichment (GSEA Lollipop)'}
         </text>
-        <text x={32} y={46} fill={inkSecondary} fontSize={config.fontSize - 1}>
-          {config.subtitle || 'Normalized Enrichment Score (NES) · Dot area scaled by leading-edge gene count'}
+        <text x={32} y={46} fill={inkSecondary} fontSize={baseFs - 1}>
+          {config.subtitle ||
+            `${theme.journal.shortName} · Normalized Enrichment Score (NES) · Dot area scaled by gene count`}
         </text>
 
         {/* Vertical Grid */}
         {config.showGrid && (
-          <g stroke={gridColor} strokeOpacity={preset.gridOpacity} strokeWidth={1}>
+          <g stroke={gridColor} strokeOpacity={0.35} strokeDasharray="3 3" strokeWidth={0.7}>
             {xTicks.map((t) => (
               <line key={`lgx-${t}`} x1={toX(t)} x2={toX(t)} y1={MARGIN.top} y2={MARGIN.top + plotH} />
             ))}
@@ -93,46 +96,73 @@ export const PathwayLollipopPlot: React.FC<PathwayLollipopPlotProps> = ({
         <line
           x1={zeroX}
           x2={zeroX}
-          y1={MARGIN.top - 4}
+          y1={MARGIN.top}
           y2={MARGIN.top + plotH}
-          stroke={inkPrimary}
+          stroke={inkAxis}
           strokeOpacity={0.55}
-          strokeWidth={1.3}
+          strokeWidth={theme.axesLinewidth}
         />
 
-        {/* Bottom Axis */}
-        <line
-          x1={MARGIN.left}
-          x2={MARGIN.left + plotW}
-          y1={MARGIN.top + plotH}
-          y2={MARGIN.top + plotH}
-          stroke={inkPrimary}
-          strokeWidth={preset.axisWidth}
-        />
+        {/* Spines */}
+        <g stroke={inkAxis} strokeWidth={theme.axesLinewidth}>
+          <line x1={MARGIN.left} x2={MARGIN.left + plotW} y1={MARGIN.top + plotH} y2={MARGIN.top + plotH} />
+          {theme.topRightSpines && (
+            <>
+              <line x1={MARGIN.left} x2={MARGIN.left + plotW} y1={MARGIN.top} y2={MARGIN.top} />
+              <line x1={MARGIN.left} x2={MARGIN.left} y1={MARGIN.top} y2={MARGIN.top + plotH} />
+              <line x1={MARGIN.left + plotW} x2={MARGIN.left + plotW} y1={MARGIN.top} y2={MARGIN.top + plotH} />
+            </>
+          )}
+        </g>
+
         {xTicks.map((t) => (
-          <g key={`lxt-${t}`} transform={`translate(${toX(t)}, ${MARGIN.top + plotH})`}>
-            <line y2={5} stroke={inkPrimary} strokeWidth={preset.axisWidth} />
-            <text y={20} textAnchor="middle" fill={inkSecondary} fontSize={config.fontSize - 1}>
+          <g key={`lxt-${t}`}>
+            <line
+              x1={toX(t)}
+              x2={toX(t)}
+              y1={MARGIN.top + plotH}
+              y2={MARGIN.top + plotH + tickLen}
+              stroke={inkAxis}
+              strokeWidth={theme.axesLinewidth}
+            />
+            {theme.tickTopRight && (
+              <line
+                x1={toX(t)}
+                x2={toX(t)}
+                y1={MARGIN.top}
+                y2={MARGIN.top - tickLen}
+                stroke={inkAxis}
+                strokeWidth={theme.axesLinewidth}
+              />
+            )}
+            <text
+              x={toX(t)}
+              y={MARGIN.top + plotH + 20}
+              textAnchor="middle"
+              fill={inkSecondary}
+              fontSize={baseFs - 1}
+            >
               {t > 0 ? `+${t}` : t}
             </text>
           </g>
         ))}
+
         <text
           x={MARGIN.left + plotW / 2}
           y={HEIGHT - 16}
           textAnchor="middle"
           fill={inkPrimary}
-          fontSize={config.fontSize + 1}
+          fontSize={baseFs + 0.5}
           fontWeight={600}
         >
           Normalized Enrichment Score (NES)
         </text>
 
-        {/* Lollipop Stems, Dots, and Pathway Names */}
+        {/* Lollipop Stems & Dots */}
         {sorted.map((row, idx) => {
           const cy = MARGIN.top + (idx + 0.5) * rowStep;
           const x = toX(row.nes);
-          const color = row.nes >= 0 ? preset.upColor : preset.downColor;
+          const color = row.nes >= 0 ? palette.upColor : palette.downColor;
           const radius = 4.5 + Math.sqrt(row.geneCount / maxCount) * 7.5;
           const isHov = hovered?.pathway === row.pathway;
 
@@ -159,7 +189,7 @@ export const PathwayLollipopPlot: React.FC<PathwayLollipopPlotProps> = ({
                 y={cy + 4}
                 textAnchor="end"
                 fill={inkPrimary}
-                fontSize={config.fontSize - 1}
+                fontSize={baseFs - 1}
                 fontWeight={isHov ? 700 : 500}
               >
                 {cleanPathwayLabel(row.pathway)}
@@ -173,7 +203,7 @@ export const PathwayLollipopPlot: React.FC<PathwayLollipopPlotProps> = ({
                 animate={{ x2: x }}
                 transition={{ ...APPLE_SPRINGS.criticallyDamped, delay: idx * 0.018 }}
                 stroke={color}
-                strokeWidth={isHov ? 3 : 2.2}
+                strokeWidth={isHov ? theme.lineWidth * 2.4 : theme.lineWidth * 1.8}
                 strokeOpacity={0.85}
                 strokeLinecap="round"
               />
@@ -183,28 +213,28 @@ export const PathwayLollipopPlot: React.FC<PathwayLollipopPlotProps> = ({
                 animate={{ cx: x, r: isHov ? radius + 1.5 : radius }}
                 transition={{ ...APPLE_SPRINGS.criticallyDamped, delay: idx * 0.018 }}
                 fill={color}
-                stroke={bgFill}
+                stroke={strokeHalo}
                 strokeWidth={1.5}
               />
             </g>
           );
         })}
 
-        {/* Legend (Right Side) */}
+        {/* Legend */}
         <g transform={`translate(${WIDTH - MARGIN.right + 20}, ${MARGIN.top + 12})`}>
-          <text x={0} y={0} fill={inkPrimary} fontSize={11} fontWeight={700}>
+          <text x={0} y={0} fill={inkPrimary} fontSize={11 * theme.fontScale} fontWeight={700}>
             Direction
           </text>
-          <circle cx={6} cy={18} r={5} fill={preset.upColor} />
-          <text x={18} y={22} fill={inkSecondary} fontSize={10.5}>
+          <circle cx={6} cy={18} r={5} fill={palette.upColor} />
+          <text x={18} y={22} fill={inkSecondary} fontSize={10.5 * theme.fontScale}>
             Activated
           </text>
-          <circle cx={6} cy={38} r={5} fill={preset.downColor} />
-          <text x={18} y={42} fill={inkSecondary} fontSize={10.5}>
+          <circle cx={6} cy={38} r={5} fill={palette.downColor} />
+          <text x={18} y={42} fill={inkSecondary} fontSize={10.5 * theme.fontScale}>
             Suppressed
           </text>
 
-          <text x={0} y={82} fill={inkPrimary} fontSize={11} fontWeight={700}>
+          <text x={0} y={82} fill={inkPrimary} fontSize={11 * theme.fontScale} fontWeight={700}>
             Gene Count
           </text>
           {[50, 100, 150].map((cnt, i) => {
@@ -213,7 +243,7 @@ export const PathwayLollipopPlot: React.FC<PathwayLollipopPlotProps> = ({
             return (
               <g key={cnt} transform={`translate(10, ${yy})`}>
                 <circle r={rad} fill={inkSecondary} fillOpacity={0.35} stroke={inkPrimary} strokeWidth={0.8} />
-                <text x={18} y={4} fill={inkSecondary} fontSize={10.5}>
+                <text x={18} y={4} fill={inkSecondary} fontSize={10.5 * theme.fontScale}>
                   {cnt}
                 </text>
               </g>

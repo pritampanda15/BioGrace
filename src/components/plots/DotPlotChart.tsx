@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { DEPlotConfig, DotPlotRow } from '../../types/biograce';
-import { JOURNAL_PRESETS, sampleRamp } from '../../lib/palettes';
+import { resolvePlotTheme, sampleRamp } from '../../lib/palettes';
 
 interface DotPlotChartProps {
   rows: DotPlotRow[];
@@ -11,7 +11,7 @@ interface DotPlotChartProps {
 
 const WIDTH = 840;
 const HEIGHT = 560;
-const MARGIN = { top: 64, right: 138, bottom: 92, left: 108 };
+const MARGIN = { top: 64, right: 142, bottom: 92, left: 108 };
 
 export const DotPlotChart: React.FC<DotPlotChartProps> = ({
   rows,
@@ -19,14 +19,17 @@ export const DotPlotChart: React.FC<DotPlotChartProps> = ({
   darkMode,
   svgRef,
 }) => {
-  const preset = JOURNAL_PRESETS[config.preset];
+  const theme = resolvePlotTheme(config);
+  const { palette, colormap } = theme;
   const [hovered, setHovered] = useState<DotPlotRow | null>(null);
 
   const paperBg = config.paperExport || !darkMode;
-  const bgFill = paperBg ? '#FFFFFF' : '#13141A';
-  const inkPrimary = paperBg ? '#1D1D1F' : '#F5F5F7';
+  const bgFill = theme.transparentBg ? 'none' : paperBg ? '#FFFFFF' : '#13141A';
+  const inkPrimary = paperBg ? '#111827' : '#F5F5F7';
+  const inkAxis = paperBg ? '#1F2937' : '#E5E7EB';
   const inkSecondary = paperBg ? '#515154' : '#A1A1AA';
   const gridColor = paperBg ? '#CBD5E1' : '#334155';
+  const baseFs = 12 * theme.fontScale;
 
   const { genes, clusters, minExpr, maxExpr } = useMemo(() => {
     const gList: string[] = [];
@@ -48,7 +51,7 @@ export const DotPlotChart: React.FC<DotPlotChartProps> = ({
   const rowStep = plotH / Math.max(1, clusters.length);
   const maxR = Math.min(13.5, Math.min(colStep, rowStep) * 0.4);
 
-  const gradId = `dotplot-grad-${config.preset}`;
+  const gradId = `dotplot-grad-${colormap.id}`;
 
   return (
     <div className="relative w-full select-none">
@@ -56,15 +59,15 @@ export const DotPlotChart: React.FC<DotPlotChartProps> = ({
         ref={svgRef}
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="w-full h-auto rounded-2xl"
-        style={{ fontFamily: preset.fontFamily }}
+        style={{ fontFamily: theme.fontFamilyCss }}
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
           <linearGradient id={gradId} x1="0%" y1="100%" x2="0%" y2="0%">
-            {preset.sequential.map((col, idx) => (
+            {colormap.stops.map((col, idx) => (
               <stop
-                key={col}
-                offset={`${(idx / (preset.sequential.length - 1)) * 100}%`}
+                key={`${colormap.id}-${idx}`}
+                offset={`${(idx / (colormap.stops.length - 1)) * 100}%`}
                 stopColor={col}
               />
             ))}
@@ -77,32 +80,33 @@ export const DotPlotChart: React.FC<DotPlotChartProps> = ({
           x={MARGIN.left}
           y={28}
           fill={inkPrimary}
-          fontSize={config.fontSize + 4}
+          fontSize={baseFs + 3.5}
           fontWeight={700}
-          letterSpacing="-0.02em"
+          letterSpacing="-0.015em"
         >
           {config.title || 'Single-Cell Canonical Marker Dot Plot'}
         </text>
-        <text x={MARGIN.left} y={46} fill={inkSecondary} fontSize={config.fontSize - 1}>
-          {config.subtitle || `${genes.length} marker genes × ${clusters.length} cell populations · Size = % expressed, Color = scaled expression`}
+        <text x={MARGIN.left} y={46} fill={inkSecondary} fontSize={baseFs - 1}>
+          {config.subtitle ||
+            `${theme.journal.shortName} · ${colormap.name} colormap · ${genes.length} markers × ${clusters.length} populations`}
         </text>
 
-        {/* Plot Frame */}
+        {/* Plot Frame (respects journal axis linewidth & 4-spine vs subtle frame) */}
         <rect
           x={MARGIN.left}
           y={MARGIN.top}
           width={plotW}
           height={plotH}
           fill="none"
-          stroke={inkPrimary}
-          strokeOpacity={0.35}
-          strokeWidth={preset.axisWidth}
-          rx={4}
+          stroke={inkAxis}
+          strokeOpacity={theme.topRightSpines ? 0.9 : 0.42}
+          strokeWidth={theme.axesLinewidth}
+          rx={theme.topRightSpines ? 0 : 4}
         />
 
         {/* Subtle Grid */}
         {config.showGrid && (
-          <g stroke={gridColor} strokeOpacity={preset.gridOpacity} strokeWidth={1}>
+          <g stroke={gridColor} strokeOpacity={0.32} strokeDasharray="2 3" strokeWidth={0.7}>
             {genes.map((g, i) => {
               const cx = MARGIN.left + (i + 0.5) * colStep;
               return <line key={`dgx-${g}`} x1={cx} x2={cx} y1={MARGIN.top} y2={MARGIN.top + plotH} />;
@@ -114,7 +118,7 @@ export const DotPlotChart: React.FC<DotPlotChartProps> = ({
           </g>
         )}
 
-        {/* Row & Column Hover Highlight Bands */}
+        {/* Hover Highlight Bands */}
         {hovered && (
           <g pointerEvents="none">
             <rect
@@ -122,7 +126,7 @@ export const DotPlotChart: React.FC<DotPlotChartProps> = ({
               y={MARGIN.top + clusters.indexOf(hovered.cluster) * rowStep}
               width={plotW}
               height={rowStep}
-              fill={preset.accentColor}
+              fill={palette.accentColor}
               fillOpacity={0.08}
             />
             <rect
@@ -130,14 +134,14 @@ export const DotPlotChart: React.FC<DotPlotChartProps> = ({
               y={MARGIN.top}
               width={colStep}
               height={plotH}
-              fill={preset.accentColor}
+              fill={palette.accentColor}
               fillOpacity={0.08}
             />
           </g>
         )}
 
         {/* Y-Axis Cell Type Labels */}
-        <g fill={inkPrimary} fontSize={config.fontSize - 0.5} fontWeight={500}>
+        <g fill={inkPrimary} fontSize={baseFs - 0.5} fontWeight={500}>
           {clusters.map((c, j) => (
             <text
               key={`cl-${c}`}
@@ -151,8 +155,8 @@ export const DotPlotChart: React.FC<DotPlotChartProps> = ({
           ))}
         </g>
 
-        {/* X-Axis Gene Labels (italicized per biological convention) */}
-        <g fill={inkPrimary} fontSize={config.fontSize - 0.5} fontStyle="italic" fontWeight={500}>
+        {/* X-Axis Gene Labels (italicized) */}
+        <g fill={inkPrimary} fontSize={baseFs - 0.5} fontStyle="italic" fontWeight={500}>
           {genes.map((g, i) => {
             const x = MARGIN.left + (i + 0.5) * colStep;
             const y = MARGIN.top + plotH + 14;
@@ -169,7 +173,7 @@ export const DotPlotChart: React.FC<DotPlotChartProps> = ({
           })}
         </g>
 
-        {/* Dots */}
+        {/* Dots colored with selected gmxgrace continuous colormap */}
         <g>
           {rows.map((r) => {
             const gi = genes.indexOf(r.gene);
@@ -187,8 +191,8 @@ export const DotPlotChart: React.FC<DotPlotChartProps> = ({
                 cx={cx}
                 cy={cy}
                 r={radius}
-                fill={sampleRamp(preset.sequential, normExpr)}
-                stroke={isActive ? inkPrimary : paperBg ? 'rgba(0,0,0,0.16)' : 'rgba(255,255,255,0.2)'}
+                fill={sampleRamp(colormap.stops, normExpr)}
+                stroke={isActive ? inkPrimary : paperBg ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.22)'}
                 strokeWidth={isActive ? 1.8 : 0.7}
                 style={{ cursor: 'pointer', transition: 'r 180ms ease' }}
                 onPointerEnter={() => setHovered(r)}
@@ -198,23 +202,32 @@ export const DotPlotChart: React.FC<DotPlotChartProps> = ({
           })}
         </g>
 
-        {/* Self-contained Publication Legend (Right Side) */}
+        {/* Self-contained Publication Legend */}
         <g transform={`translate(${WIDTH - MARGIN.right + 22}, ${MARGIN.top + 8})`}>
-          <text x={0} y={0} fill={inkPrimary} fontSize={11} fontWeight={700}>
-            Mean Expr (z)
+          <text x={0} y={0} fill={inkPrimary} fontSize={11 * theme.fontScale} fontWeight={700}>
+            Mean Expr ({colormap.name})
           </text>
-          <rect x={0} y={12} width={14} height={116} rx={4} fill={`url(#${gradId})`} stroke={inkSecondary} strokeOpacity={0.3} />
-          <text x={22} y={22} fill={inkSecondary} fontSize={10}>
+          <rect
+            x={0}
+            y={12}
+            width={14}
+            height={116}
+            rx={3}
+            fill={`url(#${gradId})`}
+            stroke={inkAxis}
+            strokeOpacity={0.35}
+          />
+          <text x={22} y={22} fill={inkSecondary} fontSize={10 * theme.fontScale}>
             {maxExpr.toFixed(1)}
           </text>
-          <text x={22} y={74} fill={inkSecondary} fontSize={10}>
+          <text x={22} y={74} fill={inkSecondary} fontSize={10 * theme.fontScale}>
             {((maxExpr + minExpr) / 2).toFixed(1)}
           </text>
-          <text x={22} y={128} fill={inkSecondary} fontSize={10}>
+          <text x={22} y={128} fill={inkSecondary} fontSize={10 * theme.fontScale}>
             {minExpr.toFixed(1)}
           </text>
 
-          <text x={0} y={168} fill={inkPrimary} fontSize={11} fontWeight={700}>
+          <text x={0} y={168} fill={inkPrimary} fontSize={11 * theme.fontScale} fontWeight={700}>
             % Expressed
           </text>
           {[25, 50, 75, 100].map((pct, idx) => {
@@ -223,7 +236,7 @@ export const DotPlotChart: React.FC<DotPlotChartProps> = ({
             return (
               <g key={`leg-${pct}`} transform={`translate(14, ${yy})`}>
                 <circle r={rad} fill={inkSecondary} fillOpacity={0.45} stroke={inkPrimary} strokeWidth={0.7} />
-                <text x={22} y={4} fill={inkSecondary} fontSize={10.5}>
+                <text x={22} y={4} fill={inkSecondary} fontSize={10.5 * theme.fontScale}>
                   {pct}%
                 </text>
               </g>

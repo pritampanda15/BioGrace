@@ -10,8 +10,18 @@ import {
   generateStatsPythonCode,
   generateStatsRCode,
 } from '../lib/codeGen';
+import { JOURNAL_PRESETS } from '../lib/palettes';
 import { renderRaincloudSvgString, renderVolcanoMASvgString } from './svgRenderer';
-import type { DEPlotConfig, DEPlotType, JournalPresetId, StatsConfig } from '../types/biograce';
+import type {
+  ColormapId,
+  ColumnWidthChoice,
+  DEPlotConfig,
+  DEPlotType,
+  FontFamilyChoice,
+  JournalPresetId,
+  PaletteId,
+  StatsConfig,
+} from '../types/biograce';
 
 function parseFlags(args: string[]): { positional: string[]; flags: Record<string, string | boolean> } {
   const positional: string[] = [];
@@ -45,9 +55,19 @@ USAGE:
   biograce deploy                        Build & deploy static BioGrace Studio to GitHub Pages (gh-pages branch)
   biograce help                          Show this help message
 
+SHARED PUBLICATION STYLE OPTIONS (gmxgrace parity):
+  --journal <id>      nature | science | cell | acs | biophysj | pnas | grace  (alias: --preset)
+  --palette <id>      okabe-ito | nature-npg | acs-classic | tol-bright | tol-muted | viridis-discrete | grayscale-pub
+  --cmap <id>         RdYlBu_r | viridis | plasma | inferno | magma | cividis | coolwarm | Spectral_r | turbo | Blues | YlGnBu | cubehelix_r
+  --font <family>     sans-serif | serif | monospace
+  --font-size <pt>    Base publication font size in pt (default: journal preset)
+  --line-width <pt>   Stroke line width in pt (default: journal preset)
+  --width <col>       single | one_half | double (default: double)
+  --dpi <num>         300 | 600 | 1200 (default: 300)
+  --transparent       Render transparent SVG/PDF/PNG background
+
 PLOT OPTIONS:
   --type <volcano|ma>                    Plot type (default: volcano)
-  --preset <nature|cell|science|okabe-ito|viridis|tol-muted>
   --fc <number>                          |log2FC| threshold (default: 1.0)
   --fdr <number>                         Adjusted P-value threshold (default: 0.05)
   --label <GENE1,GENE2,...>              Comma-separated genes to annotate
@@ -56,7 +76,6 @@ PLOT OPTIONS:
   --code-py <path.py>                    Optional reproducible matplotlib script output
 
 STATS OPTIONS:
-  --preset <nature|cell|science|okabe-ito|viridis|tol-muted>
   --paired                               Treat data as matched/paired by Subject column
   --collapse-replicates                  Collapse nested technical replicates to biological replicate means
   --adjust <BH-FDR|Holm|None>            Multiple testing adjustment (default: BH-FDR)
@@ -74,6 +93,32 @@ function writeOut(filePath: string, content: string): void {
   console.log(`  ✓ Wrote ${path.relative(process.cwd(), abs)}`);
 }
 
+function resolveStyleFlags(flags: Record<string, string | boolean>, defaultJournal: JournalPresetId) {
+  const journalId = (String(flags.journal || flags.preset || defaultJournal) as JournalPresetId);
+  const journal = JOURNAL_PRESETS[journalId] ?? JOURNAL_PRESETS[defaultJournal];
+  const palette = (String(flags.palette || journal.defaultPalette) as PaletteId);
+  const colormap = (String(flags.cmap || 'viridis') as ColormapId);
+  const fontFamily = (String(flags.font || journal.fontFamily) as FontFamilyChoice);
+  const fontSizePt = flags['font-size'] ? Number(flags['font-size']) : journal.fontSize;
+  const lineWidth = flags['line-width'] ? Number(flags['line-width']) : journal.lineWidth;
+  const columnWidth = (String(flags.width || 'double') as ColumnWidthChoice);
+  const dpi = (Number(flags.dpi || 300) as 300 | 600 | 1200);
+  const transparentBg = Boolean(flags.transparent);
+
+  return {
+    preset: journal.id,
+    palette,
+    colormap,
+    fontFamily,
+    fontSizePt,
+    lineWidth,
+    columnWidth,
+    dpi,
+    transparentBg,
+    paperExport: true,
+  };
+}
+
 function runPlot(positional: string[], flags: Record<string, string | boolean>): void {
   const inputFile = positional[0];
   let rows = generateDemoVolcanoData();
@@ -89,8 +134,8 @@ function runPlot(positional: string[], flags: Record<string, string | boolean>):
     console.log(`BioGrace Plotter · Using built-in IFN-γ Macrophage DESeq2 dataset (${rows.length} genes)`);
   }
 
+  const style = resolveStyleFlags(flags, 'nature');
   const plotType = (String(flags.type || 'volcano') as DEPlotType);
-  const preset = (String(flags.preset || 'nature') as JournalPresetId);
   const fcThreshold = Number(flags.fc ?? 1.0);
   const fdrThreshold = Number(flags.fdr ?? 0.05);
   const labeledGenes =
@@ -103,9 +148,9 @@ function runPlot(positional: string[], flags: Record<string, string | boolean>):
           .map((r) => r.gene);
 
   const config: DEPlotConfig = {
+    ...style,
     plotType,
-    preset,
-    title: String(flags.title || `Differential Expression (${preset.toUpperCase()})`),
+    title: String(flags.title || `Differential Expression (${JOURNAL_PRESETS[style.preset].name})`),
     subtitle: '',
     fcThreshold,
     fdrThreshold,
@@ -116,7 +161,6 @@ function runPlot(positional: string[], flags: Record<string, string | boolean>):
     labelOffsets: {},
     showThresholds: true,
     showGrid: true,
-    paperExport: true,
     topAutoLabelCount: 8,
   };
 
@@ -150,7 +194,7 @@ function runStats(positional: string[], flags: Record<string, string | boolean>)
     console.log(`BioGrace Stats · Using built-in Multi-Dose Skewed Viability demo (${rows.length} rows)`);
   }
 
-  const preset = (String(flags.preset || 'okabe-ito') as JournalPresetId);
+  const style = resolveStyleFlags(flags, 'science');
   const isPaired = Boolean(flags.paired);
   const collapsePseudoreplicates = Boolean(flags['collapse-replicates']);
   const correctionMethod = (String(flags.adjust || 'BH-FDR') as 'BH-FDR' | 'Holm' | 'None');
@@ -162,7 +206,8 @@ function runStats(positional: string[], flags: Record<string, string | boolean>)
     alpha: 0.05,
   });
 
-  console.log(`\n  Recommended Protocol : ${analysis.primaryTest}`);
+  console.log(`\n  Journal / Palette    : ${JOURNAL_PRESETS[style.preset].name} · ${style.palette} (${style.fontFamily})`);
+  console.log(`  Recommended Protocol : ${analysis.primaryTest}`);
   console.log(`  Normality            : ${analysis.assumptions.normalityDetail}`);
   console.log(`  Variance             : ${analysis.assumptions.varianceDetail}`);
   console.log(
@@ -174,8 +219,8 @@ function runStats(positional: string[], flags: Record<string, string | boolean>)
   console.log('');
 
   const config: StatsConfig = {
+    ...style,
     plotType: 'raincloud',
-    preset,
     title: String(flags.title || 'BioGrace Anti-Barplot Raincloud Summary'),
     yLabel,
     xLabel,
@@ -186,7 +231,6 @@ function runStats(positional: string[], flags: Record<string, string | boolean>)
     showSignificanceBrackets: true,
     showMeanDiamond: true,
     showRawPoints: true,
-    paperExport: true,
   };
 
   writeOut(String(flags.out || 'biograce_raincloud.svg'), renderRaincloudSvgString(analysis, config));

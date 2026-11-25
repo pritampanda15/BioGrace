@@ -3,6 +3,7 @@ import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import {
   Activity,
   BarChart3,
+  BookOpen,
   Check,
   Code2,
   Copy,
@@ -13,21 +14,28 @@ import {
   Image as ImageIcon,
   Layers,
   Moon,
+  Palette,
   Search,
   Sparkles,
   Sun,
   Terminal,
+  Type,
   Upload,
   Volume2,
   VolumeX,
   Wand2,
 } from 'lucide-react';
 import type {
+  ColormapId,
+  ColumnWidthChoice,
   DEPlotConfig,
   DEPlotType,
   DotPlotRow,
+  FontFamilyChoice,
   JournalPresetId,
+  PaletteId,
   PathwayRow,
+  PublicationStyleSettings,
   StatsConfig,
   StatsPlotType,
   StudioMode,
@@ -35,7 +43,14 @@ import type {
   UpSetItem,
   VolcanoRow,
 } from './types/biograce';
-import { JOURNAL_PRESET_LIST, JOURNAL_PRESETS } from './lib/palettes';
+import {
+  COLORMAP_LIST,
+  FONT_FAMILIES,
+  JOURNAL_PRESET_LIST,
+  JOURNAL_PRESETS,
+  PALETTE_LIST,
+  resolvePlotTheme,
+} from './lib/palettes';
 import {
   generateDemoDotPlotData,
   generateDemoPathwayData,
@@ -81,6 +96,7 @@ export function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [codeSheetOpen, setCodeSheetOpen] = useState(false);
+  const [licenseSheetOpen, setLicenseSheetOpen] = useState(false);
   const [codeTab, setCodeTab] = useState<'r' | 'python' | 'cli'>('r');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
@@ -104,6 +120,15 @@ export function App() {
   const [deConfig, setDeConfig] = useState<DEPlotConfig>({
     plotType: 'volcano',
     preset: 'nature',
+    palette: 'nature-npg',
+    colormap: 'RdYlBu_r',
+    fontFamily: 'sans-serif',
+    fontSizePt: 8.0,
+    lineWidth: 1.15,
+    columnWidth: 'double',
+    dpi: 300,
+    transparentBg: false,
+    paperExport: true,
     title: 'IFN-γ Stimulated Macrophages vs. Control',
     subtitle: '',
     fcThreshold: 1.0,
@@ -120,7 +145,6 @@ export function App() {
     },
     showThresholds: true,
     showGrid: true,
-    paperExport: true,
     topAutoLabelCount: 8,
   });
 
@@ -132,7 +156,16 @@ export function App() {
 
   const [statsConfig, setStatsConfig] = useState<StatsConfig>({
     plotType: 'raincloud',
-    preset: 'okabe-ito',
+    preset: 'science',
+    palette: 'okabe-ito',
+    colormap: 'viridis',
+    fontFamily: 'sans-serif',
+    fontSizePt: 8.0,
+    lineWidth: 1.1,
+    columnWidth: 'double',
+    dpi: 300,
+    transparentBg: false,
+    paperExport: true,
     title: statsDemos[0].name,
     yLabel: statsDemos[0].yLabel,
     xLabel: statsDemos[0].xLabel,
@@ -143,7 +176,6 @@ export function App() {
     showSignificanceBrackets: true,
     showMeanDiamond: true,
     showRawPoints: true,
-    paperExport: true,
   });
 
   const statsAnalysis = useMemo(
@@ -162,6 +194,27 @@ export function App() {
       statsConfig.alpha,
     ]
   );
+
+  // ---------------- Shared Style Updaters ----------------
+  const activeStyle: PublicationStyleSettings = studio === 'plotter' ? deConfig : statsConfig;
+  const resolvedTheme = useMemo(() => resolvePlotTheme(activeStyle), [activeStyle]);
+
+  const patchActiveStyle = (patch: Partial<PublicationStyleSettings>) => {
+    if (studio === 'plotter') setDeConfig((p) => ({ ...p, ...patch }));
+    else setStatsConfig((p) => ({ ...p, ...patch }));
+  };
+
+  const applyJournalPreset = (journalId: JournalPresetId) => {
+    const j = JOURNAL_PRESETS[journalId];
+    patchActiveStyle({
+      preset: j.id,
+      palette: j.defaultPalette,
+      fontFamily: j.fontFamily,
+      fontSizePt: j.fontSize,
+      lineWidth: j.lineWidth,
+    });
+    playAppleTick(soundEnabled, 'select');
+  };
 
   // ---------------- Handlers ----------------
   const selectStatsDemo = (demoId: string) => {
@@ -244,7 +297,6 @@ export function App() {
       return;
     }
 
-    // Studio 1 smart routing by current plot type
     if (deConfig.plotType === 'dotplot') {
       const rows = parseDotPlotRows(table);
       if (rows.length) {
@@ -290,21 +342,20 @@ export function App() {
     playAppleTick(soundEnabled, 'commit');
   };
 
-  // Code outputs synced live with current studio & parameters
   const generatedCode = useMemo(() => {
     if (studio === 'plotter') {
       return {
         r: generateDERCode(deConfig, deSourceFile),
         python: generateDEPythonCode(deConfig, deSourceFile),
         cli: generateDECliCommand(deConfig, deSourceFile),
-        baseName: `biograce_${deConfig.plotType}`,
+        baseName: `biograce_${deConfig.plotType}_${deConfig.preset}`,
       };
     }
     return {
       r: generateStatsRCode(statsConfig, statsAnalysis, statsSourceFile),
       python: generateStatsPythonCode(statsConfig, statsAnalysis, statsSourceFile),
       cli: generateStatsCliCommand(statsConfig, statsSourceFile),
-      baseName: `biograce_${statsConfig.plotType}`,
+      baseName: `biograce_${statsConfig.plotType}_${statsConfig.preset}`,
     };
   }, [studio, deConfig, deSourceFile, statsConfig, statsAnalysis, statsSourceFile]);
 
@@ -318,17 +369,8 @@ export function App() {
   const filteredGeneSuggestions = useMemo(() => {
     if (!geneQuery.trim()) return [];
     const q = geneQuery.toLowerCase();
-    return volcanoRows
-      .filter((r) => r.gene.toLowerCase().includes(q))
-      .slice(0, 6);
+    return volcanoRows.filter((r) => r.gene.toLowerCase().includes(q)).slice(0, 6);
   }, [geneQuery, volcanoRows]);
-
-  const activePresetId = studio === 'plotter' ? deConfig.preset : statsConfig.preset;
-  const setPresetId = (id: JournalPresetId) => {
-    if (studio === 'plotter') setDeConfig((p) => ({ ...p, preset: id }));
-    else setStatsConfig((p) => ({ ...p, preset: id }));
-    playAppleTick(soundEnabled, 'select');
-  };
 
   return (
     <MotionConfig reducedMotion="user">
@@ -348,7 +390,7 @@ export function App() {
           if (file) void handleFileIngest(file);
         }}
       >
-        {/* Drag-and-drop Translucent Overlay */}
+        {/* Drag-and-drop Overlay */}
         <AnimatePresence>
           {isDraggingFile && (
             <motion.div
@@ -374,10 +416,9 @@ export function App() {
           )}
         </AnimatePresence>
 
-        {/* Floating Apple Translucent Toolbar (§12) */}
+        {/* Floating Apple Translucent Toolbar */}
         <header className="sticky top-0 z-30 material-toolbar">
-          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-            {/* Brand Identity */}
+          <div className="max-w-[1460px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0A84FF] via-[#5E5CE6] to-[#30D158] flex items-center justify-center shadow-sm shrink-0">
                 <Sparkles className="w-5 h-5 text-white" />
@@ -385,9 +426,16 @@ export function App() {
               <div className="truncate">
                 <div className="flex items-center gap-2">
                   <span className="type-title text-base font-bold tracking-tight">BioGrace</span>
-                  <span className="hidden md:inline-block text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">
-                    Publication Studio
-                  </span>
+                  <button
+                    type="button"
+                    onPointerDown={() => {
+                      setLicenseSheetOpen(true);
+                      playAppleTick(soundEnabled, 'select');
+                    }}
+                    className="apple-press hidden md:inline-block text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
+                  >
+                    Academic Only
+                  </button>
                 </div>
                 <p className="hidden sm:block text-[11px] text-[var(--text-tertiary)] truncate">
                   Zero-friction figures, honest statistics &amp; reproducible R / Python / CLI
@@ -395,7 +443,6 @@ export function App() {
               </div>
             </div>
 
-            {/* Primary Studio Switcher (Wayfinding §16) */}
             <div className="hidden lg:block">
               <AppleSegmentedControl<StudioMode>
                 layoutId="studio-nav-pill"
@@ -417,7 +464,6 @@ export function App() {
               />
             </div>
 
-            {/* Action Cluster */}
             <div className="flex items-center gap-2">
               <input
                 ref={fileInputRef}
@@ -472,7 +518,6 @@ export function App() {
             </div>
           </div>
 
-          {/* Mobile/Tablet Studio Switcher */}
           <div className="lg:hidden px-4 pb-3">
             <AppleSegmentedControl<StudioMode>
               layoutId="studio-nav-pill-mobile"
@@ -489,9 +534,9 @@ export function App() {
           </div>
         </header>
 
-        {/* Main Workbench Layout */}
-        <main className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 py-5 grid grid-cols-1 lg:grid-cols-[336px_minmax(0,1fr)] gap-6 items-start">
-          {/* LEFT INSPECTOR SIDEBAR (Heavier Translucent Material §12) */}
+        {/* Main Workbench */}
+        <main className="flex-1 max-w-[1460px] w-full mx-auto px-4 sm:px-6 py-5 grid grid-cols-1 lg:grid-cols-[356px_minmax(0,1fr)] gap-6 items-start">
+          {/* LEFT INSPECTOR SIDEBAR */}
           <aside className="material-sidebar rounded-3xl border p-5 space-y-5 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6.2rem)] lg:overflow-y-auto scroll-mask-y">
             {studio === 'plotter' ? (
               <>
@@ -549,7 +594,7 @@ export function App() {
 
                 {/* Threshold Sliders (Volcano / MA) */}
                 {(deConfig.plotType === 'volcano' || deConfig.plotType === 'ma') && (
-                  <div className="space-y-4 pt-1 border-t border-[var(--border-hairline)]">
+                  <div className="space-y-4 pt-3 border-t border-[var(--border-hairline)]">
                     <div>
                       <div className="flex justify-between text-xs mb-1.5 tabular-nums">
                         <span className="font-medium text-[var(--text-secondary)]">|log2FC| Cutoff</span>
@@ -573,9 +618,7 @@ export function App() {
                     <div>
                       <div className="flex justify-between text-xs mb-1.5 tabular-nums">
                         <span className="font-medium text-[var(--text-secondary)]">FDR Cutoff (q)</span>
-                        <span className="font-semibold text-[var(--text-primary)]">
-                          {deConfig.fdrThreshold}
-                        </span>
+                        <span className="font-semibold text-[var(--text-primary)]">{deConfig.fdrThreshold}</span>
                       </div>
                       <div className="grid grid-cols-4 gap-1">
                         {[0.1, 0.05, 0.01, 0.001].map((val) => (
@@ -596,26 +639,6 @@ export function App() {
                           </button>
                         ))}
                       </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-xs mb-1.5 tabular-nums">
-                        <span className="font-medium text-[var(--text-secondary)]">Point Size</span>
-                        <span className="font-semibold text-[var(--text-primary)]">
-                          {deConfig.pointSize.toFixed(1)} px
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min={2}
-                        max={6.5}
-                        step={0.2}
-                        value={deConfig.pointSize}
-                        onChange={(e) =>
-                          setDeConfig((p) => ({ ...p, pointSize: Number(e.target.value) }))
-                        }
-                        className="apple-slider"
-                      />
                     </div>
 
                     {/* Interactive Gene Search & Label Manager */}
@@ -679,16 +702,13 @@ export function App() {
                           </button>
                         ))}
                       </div>
-                      <p className="mt-2 text-[11px] text-[var(--text-tertiary)]">
-                        Tip: Click any dot on the plot to toggle its label, or drag any gene label directly to reposition it.
-                      </p>
                     </div>
                   </div>
                 )}
               </>
             ) : (
               <>
-                {/* Studio 2 Inspector: Wet-Lab Demo Datasets */}
+                {/* Studio 2 Wet-Lab Demos */}
                 <div>
                   <label className="type-label text-[11px] font-semibold uppercase text-[var(--text-tertiary)] block mb-2">
                     Wet-Lab Case Studies (or Drop CSV)
@@ -762,20 +782,17 @@ export function App() {
                   </div>
                 </div>
 
-                {/* Study Design & Multiple Testing Controls */}
+                {/* Study Design & Multiple Testing */}
                 <div className="space-y-3 pt-3 border-t border-[var(--border-hairline)]">
                   <label className="flex items-center justify-between text-xs cursor-pointer">
                     <span className="font-medium text-[var(--text-primary)]">Paired / Matched Subjects</span>
                     <input
                       type="checkbox"
                       checked={statsConfig.isPaired}
-                      onChange={(e) =>
-                        setStatsConfig((p) => ({ ...p, isPaired: e.target.checked }))
-                      }
+                      onChange={(e) => setStatsConfig((p) => ({ ...p, isPaired: e.target.checked }))}
                       className="accent-[var(--accent)] w-4 h-4 rounded"
                     />
                   </label>
-
                   <label className="flex items-center justify-between text-xs cursor-pointer">
                     <span className="font-medium text-[var(--text-primary)]">Significance Brackets</span>
                     <input
@@ -787,7 +804,6 @@ export function App() {
                       className="accent-[var(--accent)] w-4 h-4 rounded"
                     />
                   </label>
-
                   <div>
                     <span className="type-label text-[11px] font-semibold uppercase text-[var(--text-tertiary)] block mb-1.5">
                       Multiple Testing Correction
@@ -810,38 +826,125 @@ export function App() {
               </>
             )}
 
-            {/* Shared Journal Colorblind-Safe Presets */}
-            <div className="pt-3 border-t border-[var(--border-hairline)]">
-              <div className="flex items-center justify-between mb-2">
-                <label className="type-label text-[11px] font-semibold uppercase text-[var(--text-tertiary)]">
-                  Journal Colorblind-Safe Presets
+            {/* ==============================================================
+             * FULL GMXGRACE JOURNAL, PALETTE, COLORMAP & TYPOGRAPHY SYSTEM
+             * ============================================================ */}
+            <div className="pt-3 border-t border-[var(--border-hairline)] space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="type-label text-[11px] font-semibold uppercase text-[var(--text-tertiary)] flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5" />
+                  Journal Presets (7)
                 </label>
-                <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                  CVD Safe
+                <span className="text-[10px] font-medium text-[var(--text-tertiary)] tabular-nums">
+                  {resolvedTheme.widthMm} mm · {resolvedTheme.topRightSpines ? '4-spine' : 'open'}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-1.5">
-                {JOURNAL_PRESET_LIST.map((preset) => {
-                  const active = activePresetId === preset.id;
+                {JOURNAL_PRESET_LIST.map((journal) => {
+                  const active = activeStyle.preset === journal.id;
                   return (
                     <button
-                      key={preset.id}
+                      key={journal.id}
                       type="button"
-                      onPointerDown={() => setPresetId(preset.id)}
+                      title={journal.description}
+                      onPointerDown={() => applyJournalPreset(journal.id)}
                       className={`apple-press p-2 rounded-xl text-left border transition-colors ${
+                        journal.id === 'grace' ? 'col-span-2' : ''
+                      } ${
                         active
                           ? 'bg-[var(--bg-elevated)] border-[var(--accent)] ring-1 ring-[var(--accent)]/30'
                           : 'bg-[var(--bg-elevated)]/55 border-[var(--border-hairline)] hover:bg-[var(--bg-elevated)]'
                       }`}
                     >
-                      <div className="text-[11px] font-semibold text-[var(--text-primary)] truncate">
-                        {preset.name}
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[11px] font-semibold text-[var(--text-primary)] truncate">
+                          {journal.name}
+                        </span>
                       </div>
-                      <div className="mt-1.5 flex items-center gap-1">
-                        {preset.categorical.slice(0, 5).map((hex) => (
+                      <div className="mt-0.5 flex items-center justify-between text-[10px] text-[var(--text-tertiary)] tabular-nums">
+                        <span>
+                          {journal.widthsMm.single}/{journal.widthsMm.double} mm
+                        </span>
+                        <span>{journal.topRightSpines ? 'Box · In' : 'Open · Out'}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Column Width & Export DPI */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10.5px] font-semibold text-[var(--text-secondary)] block mb-1">
+                    Column Width
+                  </label>
+                  <select
+                    value={activeStyle.columnWidth}
+                    onChange={(e) =>
+                      patchActiveStyle({ columnWidth: e.target.value as ColumnWidthChoice })
+                    }
+                    className="w-full px-2.5 py-1.5 rounded-xl text-xs bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--text-primary)]"
+                  >
+                    <option value="single">Single ({resolvedTheme.journal.widthsMm.single} mm)</option>
+                    <option value="one_half">1.5 Col ({resolvedTheme.journal.widthsMm.one_half} mm)</option>
+                    <option value="double">Double ({resolvedTheme.journal.widthsMm.double} mm)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10.5px] font-semibold text-[var(--text-secondary)] block mb-1">
+                    Export DPI
+                  </label>
+                  <select
+                    value={activeStyle.dpi}
+                    onChange={(e) =>
+                      patchActiveStyle({ dpi: Number(e.target.value) as 300 | 600 | 1200 })
+                    }
+                    className="w-full px-2.5 py-1.5 rounded-xl text-xs bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--text-primary)] tabular-nums"
+                  >
+                    <option value={300}>300 DPI</option>
+                    <option value={600}>600 DPI</option>
+                    <option value={1200}>1200 DPI</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* 7 Colorblind-Safe & Publication Palettes */}
+            <div className="pt-3 border-t border-[var(--border-hairline)] space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="type-label text-[11px] font-semibold uppercase text-[var(--text-tertiary)] flex items-center gap-1.5">
+                  <Palette className="w-3.5 h-3.5" />
+                  Color Palettes (7)
+                </label>
+                <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                  CVD Safe
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                {PALETTE_LIST.map((pal) => {
+                  const active = activeStyle.palette === pal.id;
+                  return (
+                    <button
+                      key={pal.id}
+                      type="button"
+                      onPointerDown={() => {
+                        patchActiveStyle({ palette: pal.id as PaletteId });
+                        playAppleTick(soundEnabled, 'select');
+                      }}
+                      className={`apple-press w-full px-2.5 py-1.5 rounded-xl border flex items-center justify-between gap-2 transition-colors ${
+                        active
+                          ? 'bg-[var(--bg-elevated)] border-[var(--accent)] ring-1 ring-[var(--accent)]/30'
+                          : 'bg-[var(--bg-elevated)]/55 border-[var(--border-hairline)] hover:bg-[var(--bg-elevated)]'
+                      }`}
+                    >
+                      <span className="text-[11px] font-semibold text-[var(--text-primary)] truncate">
+                        {pal.name}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {pal.colors.slice(0, 6).map((hex) => (
                           <span
                             key={hex}
-                            className="w-3.5 h-2 rounded-full"
+                            className="w-3.5 h-2.5 rounded-sm border border-black/10"
                             style={{ backgroundColor: hex }}
                           />
                         ))}
@@ -850,27 +953,116 @@ export function App() {
                   );
                 })}
               </div>
+
+              {/* 12 Continuous Colormaps (for scRNA Dot Plot & Continuous Scales) */}
+              <div className="pt-1">
+                <label className="text-[10.5px] font-semibold text-[var(--text-secondary)] block mb-1">
+                  Continuous Colormap (12 · Dot Plot)
+                </label>
+                <select
+                  value={activeStyle.colormap}
+                  onChange={(e) => patchActiveStyle({ colormap: e.target.value as ColormapId })}
+                  className="w-full px-2.5 py-1.5 rounded-xl text-xs bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--text-primary)]"
+                >
+                  {COLORMAP_LIST.map((cm) => (
+                    <option key={cm.id} value={cm.id}>
+                      {cm.name}
+                    </option>
+                  ))}
+                </select>
+                <div
+                  className="mt-1.5 h-2 rounded-full border border-black/10"
+                  style={{
+                    background: `linear-gradient(to right, ${resolvedTheme.colormap.stops.join(', ')})`,
+                  }}
+                />
+              </div>
             </div>
 
-            {/* White Paper Publication Canvas Toggle */}
-            <div className="pt-3 border-t border-[var(--border-hairline)] flex items-center justify-between text-xs">
-              <span className="font-medium text-[var(--text-secondary)]">Print-Ready White Canvas</span>
-              <input
-                type="checkbox"
-                checked={studio === 'plotter' ? deConfig.paperExport : statsConfig.paperExport}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  if (studio === 'plotter') setDeConfig((p) => ({ ...p, paperExport: checked }));
-                  else setStatsConfig((p) => ({ ...p, paperExport: checked }));
-                }}
-                className="accent-[var(--accent)] w-4 h-4 rounded"
-              />
+            {/* Typography, Line Width & Canvas Controls */}
+            <div className="pt-3 border-t border-[var(--border-hairline)] space-y-3">
+              <label className="type-label text-[11px] font-semibold uppercase text-[var(--text-tertiary)] flex items-center gap-1.5">
+                <Type className="w-3.5 h-3.5" />
+                Typography &amp; Strokes
+              </label>
+
+              <div>
+                <label className="text-[10.5px] font-semibold text-[var(--text-secondary)] block mb-1">
+                  Font Family
+                </label>
+                <select
+                  value={activeStyle.fontFamily}
+                  onChange={(e) =>
+                    patchActiveStyle({ fontFamily: e.target.value as FontFamilyChoice })
+                  }
+                  className="w-full px-2.5 py-1.5 rounded-xl text-xs bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--text-primary)]"
+                >
+                  {(Object.keys(FONT_FAMILIES) as FontFamilyChoice[]).map((k) => (
+                    <option key={k} value={k}>
+                      {FONT_FAMILIES[k].label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <div className="flex justify-between text-[11px] mb-1 tabular-nums">
+                    <span className="text-[var(--text-secondary)]">Font (pt)</span>
+                    <span className="font-semibold">{activeStyle.fontSizePt.toFixed(1)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={6}
+                    max={12}
+                    step={0.5}
+                    value={activeStyle.fontSizePt}
+                    onChange={(e) => patchActiveStyle({ fontSizePt: Number(e.target.value) })}
+                    className="apple-slider"
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between text-[11px] mb-1 tabular-nums">
+                    <span className="text-[var(--text-secondary)]">Line (pt)</span>
+                    <span className="font-semibold">{activeStyle.lineWidth.toFixed(2)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0.6}
+                    max={2.4}
+                    step={0.1}
+                    value={activeStyle.lineWidth}
+                    onChange={(e) => patchActiveStyle({ lineWidth: Number(e.target.value) })}
+                    className="apple-slider"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <label className="flex items-center justify-between text-xs cursor-pointer">
+                  <span className="font-medium text-[var(--text-secondary)]">Transparent Background</span>
+                  <input
+                    type="checkbox"
+                    checked={activeStyle.transparentBg}
+                    onChange={(e) => patchActiveStyle({ transparentBg: e.target.checked })}
+                    className="accent-[var(--accent)] w-4 h-4 rounded"
+                  />
+                </label>
+                <label className="flex items-center justify-between text-xs cursor-pointer">
+                  <span className="font-medium text-[var(--text-secondary)]">Print-Ready White Canvas</span>
+                  <input
+                    type="checkbox"
+                    checked={activeStyle.paperExport}
+                    onChange={(e) => patchActiveStyle({ paperExport: e.target.checked })}
+                    className="accent-[var(--accent)] w-4 h-4 rounded"
+                  />
+                </label>
+              </div>
             </div>
           </aside>
 
           {/* MAIN STAGE */}
           <section className="space-y-5 min-w-0">
-            {/* Upload Confirmation Toast */}
             <AnimatePresence>
               {uploadBanner && (
                 <motion.div
@@ -903,10 +1095,9 @@ export function App() {
                     ? 'DE & Single-Cell Publication Plotter'
                     : "Biologist's Statistical Advisor & Anti-Barplot Studio"}
                 </h1>
-                <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-1">
-                  {studio === 'plotter'
-                    ? `Source: ${deSourceFile} · Preset: ${JOURNAL_PRESETS[deConfig.preset].name}`
-                    : `Source: ${statsSourceFile} · ${statsAnalysis.primaryTest}`}
+                <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-1 tabular-nums">
+                  {resolvedTheme.journal.name} ({resolvedTheme.widthMm} mm) · {resolvedTheme.palette.name} ·{' '}
+                  {activeStyle.fontFamily} · {activeStyle.dpi} DPI
                 </p>
               </div>
 
@@ -962,13 +1153,13 @@ export function App() {
                 <button
                   type="button"
                   onPointerDown={() => {
-                    void exportPngFile(svgRef.current, generatedCode.baseName, 3);
+                    void exportPngFile(svgRef.current, generatedCode.baseName, activeStyle.dpi);
                     playAppleTick(soundEnabled, 'commit');
                   }}
                   className="apple-press inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-[var(--bg-elevated)] border border-[var(--border-hairline)] shadow-xs hover:border-[var(--accent)]"
                 >
                   <ImageIcon className="w-3.5 h-3.5 text-emerald-500" />
-                  300 DPI PNG
+                  {activeStyle.dpi} DPI PNG
                 </button>
               </div>
             </div>
@@ -980,6 +1171,15 @@ export function App() {
               animate={{ opacity: 1, y: 0 }}
               transition={APPLE_SPRINGS.criticallyDamped}
               className="material-card rounded-3xl p-3 sm:p-5"
+              style={
+                activeStyle.transparentBg
+                  ? {
+                      backgroundImage:
+                        'repeating-conic-gradient(rgba(128,128,128,0.12) 0% 25%, transparent 0% 50%)',
+                      backgroundSize: '16px 16px',
+                    }
+                  : undefined
+              }
             >
               {studio === 'plotter' ? (
                 <>
@@ -1047,7 +1247,7 @@ export function App() {
               />
             )}
 
-            {/* Studio 1 Inline Reproducibility Preview Strip */}
+            {/* Studio 1 Inline Reproducibility Strip */}
             {studio === 'plotter' && (
               <div className="material-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -1059,7 +1259,7 @@ export function App() {
                       100% Reproducible Publication Code &amp; CLI
                     </h3>
                     <p className="text-xs text-[var(--text-secondary)]">
-                      Every threshold, journal palette, and gene annotation stays synced with R (ggplot2), Python (matplotlib), and <code className="font-mono">biograce</code> CLI.
+                      Every journal spine rule, font family, palette, colormap, and threshold stays synced with R, Python, and <code className="font-mono">biograce</code> CLI.
                     </p>
                   </div>
                 </div>
@@ -1078,7 +1278,7 @@ export function App() {
           </section>
         </main>
 
-        {/* Fluid Right-Edge Reproducible Code & CLI Sheet (Interruptible, Momentum-Projected) */}
+        {/* Fluid Right-Edge Reproducible Code & CLI Sheet */}
         <FluidSheet
           open={codeSheetOpen}
           onClose={() => setCodeSheetOpen(false)}
@@ -1150,20 +1350,33 @@ export function App() {
                   : generatedCode.cli}
               </code>
             </pre>
+          </div>
+        </FluidSheet>
 
-            {/* GitHub Pages Deployment CLI Quick Reference */}
-            <div className="rounded-2xl p-4 bg-[var(--bg-subtle)] border border-[var(--border-hairline)] space-y-2">
-              <div className="text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
-                <Terminal className="w-3.5 h-3.5 text-[var(--accent)]" />
-                Deploy BioGrace via GitHub Pages CLI
-              </div>
-              <pre className="p-3 rounded-xl bg-[#111319] text-[#A5D6FF] text-[11px] font-mono overflow-x-auto">
-{`# One-command static build & deploy to GitHub Pages
-npm run deploy
-# Or via the bundled BioGrace CLI
-npx biograce deploy`}
-              </pre>
+        {/* Academic-Only License Sheet */}
+        <FluidSheet
+          open={licenseSheetOpen}
+          onClose={() => setLicenseSheetOpen(false)}
+          title="Academic & Non-Commercial License"
+          subtitle="BioGrace v1.0 · Copyright © 2026 Pritam Panda"
+          soundEnabled={soundEnabled}
+        >
+          <div className="space-y-4 text-xs leading-relaxed text-[var(--text-secondary)]">
+            <div className="rounded-2xl p-4 bg-amber-500/10 border border-amber-500/30 text-[var(--text-primary)]">
+              <strong>Academic &amp; Non-Commercial Research Only:</strong> BioGrace is free for universities,
+              non-profit research institutes, teaching, theses, and non-commercial scientific publications.
+              Commercial use requires written permission from the copyright holder.
             </div>
+            <p>
+              <strong>Permitted Uses:</strong> Generating publication figures, statistical analyses, and reproducible
+              R/Python scripts for academic manuscripts, lab notebooks, workshops, and classroom instruction with
+              attribution to <code className="font-mono">github.com/pritampanda15/BioGrace</code>.
+            </p>
+            <p>
+              <strong>Restricted Uses:</strong> Commercial pharmaceutical/biotech R&amp;D, paid consulting,
+              fee-for-service analytics, or integration into commercial/SaaS products without a separate commercial
+              license.
+            </p>
           </div>
         </FluidSheet>
       </div>

@@ -27,8 +27,17 @@ Stop fighting `ggplot2` and `matplotlib` layouts for hours after finishing `DESe
   - **Single-Cell Marker Dot Plot** — dot size = `% expressed`, perceptual ramp = mean expression, self-contained vector colorbar & size legend.
   - **DEG UpSet Plot** — multi-contrast intersection bars, connection matrix, set-size bars, and clickable overlapping gene lists.
   - **Ranked Pathway Lollipop Chart** — diverging NES lollipops sized by gene count.
-- **Colorblind-safe journal presets:** Nature (NPG), Cell Press, Science (AAAS), Okabe–Ito, Viridis, and Paul Tol Muted.
-- **Publication exports:** True vector **SVG**, vector **PDF** (`svg2pdf.js`), **300 DPI PNG**, plus live-synced **R (`ggplot2`)**, **Python (`matplotlib`/`seaborn`)**, and **BioGrace CLI** commands.
+- **7 Scientific Journal Presets (full `gmxgrace` parity):**
+  - **Nature Portfolio** (`89 / 120 / 183 mm`, open frame, outward ticks)
+  - **Science (AAAS)** (`75 / 120 / 175 mm`, open frame, outward ticks)
+  - **Cell Press** (`85 / 114 / 174 mm`, open frame, outward ticks)
+  - **ACS (JCTC / JACS / JCIM)** (`84.6 / 130 / 177.8 mm`, 4-spine boxed frame, inward ticks)
+  - **Biophysical Journal** (`85 / 128 / 178 mm`, 4-spine boxed frame, inward ticks)
+  - **PNAS** (`87 / 114 / 178 mm`, open frame, outward ticks)
+  - **Modern xmgrace** (`110 / 145 / 185 mm`, 4-spine boxed frame, bold inward ticks)
+- **7 Colorblind-Safe & Publication Palettes:** `Okabe–Ito`, `Nature (NPG)`, `ACS Classic`, `Paul Tol Bright`, `Paul Tol Muted`, `Viridis Discrete`, and `Grayscale Pub`.
+- **12 Continuous Colormaps (for scRNA Dot Plots & continuous scales):** `RdYlBu_r`, `viridis`, `plasma`, `inferno`, `magma`, `cividis`, `coolwarm`, `Spectral_r`, `turbo`, `Blues`, `YlGnBu`, and `cubehelix_r`.
+- **Typography & Export Controls:** `Sans-Serif (Helvetica/Arial)`, `Serif (Times New Roman/Georgia)`, `Monospace`, custom font size (`pt`), stroke line width (`pt`), Single / 1.5 / Double column widths (`mm`), Transparent Background, and `300 / 600 / 1200 DPI` PNG plus vector **SVG** & **PDF** (`svg2pdf.js`).
 
 ### 2. Biologist's Statistical Test Advisor & Anti-Barplot Studio
 Stop choosing inappropriate statistical tests or hiding distributions behind dynamite bar charts + SEM:

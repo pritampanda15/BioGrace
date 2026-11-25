@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { DEPlotConfig, UpSetItem } from '../../types/biograce';
-import { JOURNAL_PRESETS } from '../../lib/palettes';
+import { resolvePlotTheme } from '../../lib/palettes';
 import { APPLE_SPRINGS, playAppleTick } from '../../motion/applePhysics';
 
 interface UpSetPlotProps {
@@ -22,14 +22,17 @@ export const UpSetPlot: React.FC<UpSetPlotProps> = ({
   soundEnabled,
   svgRef,
 }) => {
-  const preset = JOURNAL_PRESETS[config.preset];
+  const theme = resolvePlotTheme(config);
+  const { palette } = theme;
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   const paperBg = config.paperExport || !darkMode;
-  const bgFill = paperBg ? '#FFFFFF' : '#13141A';
-  const inkPrimary = paperBg ? '#1D1D1F' : '#F5F5F7';
+  const bgFill = theme.transparentBg ? 'none' : paperBg ? '#FFFFFF' : '#13141A';
+  const inkPrimary = paperBg ? '#111827' : '#F5F5F7';
+  const inkAxis = paperBg ? '#1F2937' : '#E5E7EB';
   const inkSecondary = paperBg ? '#515154' : '#A1A1AA';
   const mutedDot = paperBg ? '#E2E8F0' : '#2C2F3A';
+  const baseFs = 12 * theme.fontScale;
 
   const { setTotals, intersections } = useMemo(() => {
     const setCounts = new Map<string, number>();
@@ -58,7 +61,6 @@ export const UpSetPlot: React.FC<UpSetPlotProps> = ({
 
   const activeCombo = intersections.find((c) => c.key === selectedKey) ?? intersections[0];
 
-  // Layout geometry
   const barTop = 64;
   const barBottom = 328;
   const barH = barBottom - barTop;
@@ -78,7 +80,7 @@ export const UpSetPlot: React.FC<UpSetPlotProps> = ({
         ref={svgRef}
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="w-full h-auto rounded-2xl"
-        style={{ fontFamily: preset.fontFamily }}
+        style={{ fontFamily: theme.fontFamilyCss }}
         xmlns="http://www.w3.org/2000/svg"
       >
         <rect x={0} y={0} width={WIDTH} height={HEIGHT} rx={16} fill={bgFill} />
@@ -87,33 +89,29 @@ export const UpSetPlot: React.FC<UpSetPlotProps> = ({
           x={32}
           y={28}
           fill={inkPrimary}
-          fontSize={config.fontSize + 4}
+          fontSize={baseFs + 3.5}
           fontWeight={700}
-          letterSpacing="-0.02em"
+          letterSpacing="-0.015em"
         >
           {config.title || 'DEG Set Intersections (UpSet Plot)'}
         </text>
-        <text x={32} y={46} fill={inkSecondary} fontSize={config.fontSize - 1}>
-          {config.subtitle || `${items.length} unique features across ${setTotals.length} experimental contrasts · Click any bar to inspect shared genes`}
+        <text x={32} y={46} fill={inkSecondary} fontSize={baseFs - 1}>
+          {config.subtitle ||
+            `${theme.journal.shortName} · ${items.length} features across ${setTotals.length} contrasts · Click any bar to inspect shared genes`}
         </text>
 
-        {/* Top Y-Axis (Intersection Size) */}
-        <line
-          x1={matrixLeft - 8}
-          x2={matrixLeft - 8}
-          y1={barTop}
-          y2={barBottom}
-          stroke={inkPrimary}
-          strokeWidth={preset.axisWidth}
-        />
-        <line
-          x1={matrixLeft - 8}
-          x2={matrixRight}
-          y1={barBottom}
-          y2={barBottom}
-          stroke={inkPrimary}
-          strokeWidth={preset.axisWidth}
-        />
+        {/* Top Bar Axes (respecting 4-spine boxed vs open) */}
+        <g stroke={inkAxis} strokeWidth={theme.axesLinewidth}>
+          <line x1={matrixLeft - 8} x2={matrixLeft - 8} y1={barTop} y2={barBottom} />
+          <line x1={matrixLeft - 8} x2={matrixRight} y1={barBottom} y2={barBottom} />
+          {theme.topRightSpines && (
+            <>
+              <line x1={matrixLeft - 8} x2={matrixRight} y1={barTop} y2={barTop} />
+              <line x1={matrixRight} x2={matrixRight} y1={barTop} y2={barBottom} />
+            </>
+          )}
+        </g>
+
         {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
           const val = Math.round(maxInter * frac);
           const y = barBottom - frac * barH;
@@ -126,10 +124,11 @@ export const UpSetPlot: React.FC<UpSetPlotProps> = ({
                   y1={y}
                   y2={y}
                   stroke={inkSecondary}
-                  strokeOpacity={preset.gridOpacity}
+                  strokeOpacity={0.22}
+                  strokeDasharray="3 3"
                 />
               )}
-              <text x={matrixLeft - 16} y={y + 4} textAnchor="end" fill={inkSecondary} fontSize={10.5}>
+              <text x={matrixLeft - 16} y={y + 4} textAnchor="end" fill={inkSecondary} fontSize={10.5 * theme.fontScale}>
                 {val}
               </text>
             </g>
@@ -139,7 +138,7 @@ export const UpSetPlot: React.FC<UpSetPlotProps> = ({
           transform={`translate(${matrixLeft - 52}, ${(barTop + barBottom) / 2}) rotate(-90)`}
           textAnchor="middle"
           fill={inkPrimary}
-          fontSize={config.fontSize}
+          fontSize={baseFs}
           fontWeight={600}
         >
           Intersection Size
@@ -151,7 +150,7 @@ export const UpSetPlot: React.FC<UpSetPlotProps> = ({
           const bw = Math.min(28, colW * 0.58);
           const h = (combo.count / maxInter) * (barH - 18);
           const isSelected = activeCombo?.key === combo.key;
-          const fill = isSelected ? preset.upColor : preset.downColor;
+          const fill = isSelected ? palette.upColor : palette.downColor;
 
           return (
             <g
@@ -165,19 +164,19 @@ export const UpSetPlot: React.FC<UpSetPlotProps> = ({
               <motion.rect
                 x={cx - bw / 2}
                 width={bw}
-                rx={5}
+                rx={4}
                 initial={{ y: barBottom, height: 0 }}
                 animate={{ y: barBottom - h, height: h }}
                 transition={APPLE_SPRINGS.criticallyDamped}
                 fill={fill}
-                fillOpacity={isSelected ? 0.96 : 0.78}
+                fillOpacity={isSelected ? 0.96 : 0.8}
               />
               <text
                 x={cx}
                 y={barBottom - h - 7}
                 textAnchor="middle"
-                fill={isSelected ? preset.upColor : inkPrimary}
-                fontSize={11}
+                fill={isSelected ? palette.upColor : inkPrimary}
+                fontSize={11 * theme.fontScale}
                 fontWeight={700}
               >
                 {combo.count}
@@ -210,7 +209,7 @@ export const UpSetPlot: React.FC<UpSetPlotProps> = ({
                 y={cy + 4}
                 textAnchor="end"
                 fill={inkPrimary}
-                fontSize={config.fontSize - 0.5}
+                fontSize={baseFs - 0.5}
                 fontWeight={600}
               >
                 {st.name}
@@ -221,21 +220,28 @@ export const UpSetPlot: React.FC<UpSetPlotProps> = ({
                 width={bw}
                 height={14}
                 rx={4}
-                fill={preset.categorical[rIdx % preset.categorical.length]}
-                fillOpacity={0.85}
+                fill={palette.colors[rIdx % palette.colors.length]}
+                fillOpacity={0.88}
               />
-              <text x={barRight - bw - 6} y={cy + 4} textAnchor="end" fill={inkSecondary} fontSize={10}>
+              <text x={barRight - bw - 6} y={cy + 4} textAnchor="end" fill={inkSecondary} fontSize={10 * theme.fontScale}>
                 {st.count}
               </text>
             </g>
           );
         })}
 
-        <text x={matrixLeft - 140} y={matrixTop + setTotals.length * rowH + 18} textAnchor="middle" fill={inkSecondary} fontSize={10.5} fontWeight={600}>
+        <text
+          x={matrixLeft - 140}
+          y={matrixTop + setTotals.length * rowH + 18}
+          textAnchor="middle"
+          fill={inkSecondary}
+          fontSize={10.5 * theme.fontScale}
+          fontWeight={600}
+        >
           Set Size
         </text>
 
-        {/* Intersection Matrix Dots & Vertical Connectors */}
+        {/* Matrix Dots & Connectors */}
         {intersections.map((combo, cIdx) => {
           const cx = matrixLeft + (cIdx + 0.5) * colW;
           const memberIndices = setTotals
@@ -244,7 +250,7 @@ export const UpSetPlot: React.FC<UpSetPlotProps> = ({
           const minR = Math.min(...memberIndices);
           const maxR = Math.max(...memberIndices);
           const isSelected = activeCombo?.key === combo.key;
-          const dotColor = isSelected ? preset.upColor : inkPrimary;
+          const dotColor = isSelected ? palette.upColor : inkPrimary;
 
           return (
             <g
@@ -262,7 +268,7 @@ export const UpSetPlot: React.FC<UpSetPlotProps> = ({
                   y1={matrixTop + (minR + 0.5) * rowH}
                   y2={matrixTop + (maxR + 0.5) * rowH}
                   stroke={dotColor}
-                  strokeWidth={2.6}
+                  strokeWidth={Math.max(2, theme.lineWidth * 2)}
                 />
               )}
               {setTotals.map((st, rIdx) => {
@@ -283,7 +289,6 @@ export const UpSetPlot: React.FC<UpSetPlotProps> = ({
         })}
       </svg>
 
-      {/* Interactive Gene Overlap Inspector Strip */}
       {activeCombo && (
         <div className="rounded-xl px-4 py-3 text-xs border border-[var(--border-hairline)] bg-[var(--bg-subtle)] flex flex-wrap items-center justify-between gap-2">
           <div>

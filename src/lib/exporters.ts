@@ -51,9 +51,10 @@ export async function exportVectorPdfFile(svg: SVGSVGElement | null, baseName: s
   pdf.save(`${baseName}.pdf`);
 }
 
-/** Download 300-DPI raster PNG for slides & manuscripts */
-export async function exportPngFile(svg: SVGSVGElement | null, baseName: string, scale = 3): Promise<void> {
+/** Download high-DPI raster PNG (300 / 600 / 1200 DPI) for slides & manuscripts */
+export async function exportPngFile(svg: SVGSVGElement | null, baseName: string, dpi = 300): Promise<void> {
   if (!svg) return;
+  const scale = Math.min(6, Math.max(2, dpi / 100));
   const xml = serializeSvg(svg);
   const blob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -69,14 +70,14 @@ export async function exportPngFile(svg: SVGSVGElement | null, baseName: string,
   const w = vb && vb.width > 0 ? vb.width : 840;
   const h = vb && vb.height > 0 ? vb.height : 560;
   const canvas = document.createElement('canvas');
-  canvas.width = w * scale;
-  canvas.height = h * scale;
+  canvas.width = Math.round(w * scale);
+  canvas.height = Math.round(h * scale);
   const ctx = canvas.getContext('2d');
   if (ctx) {
     ctx.scale(scale, scale);
     ctx.drawImage(img, 0, 0, w, h);
     canvas.toBlob((pngBlob) => {
-      if (pngBlob) triggerBlobDownload(pngBlob, `${baseName}_300dpi.png`);
+      if (pngBlob) triggerBlobDownload(pngBlob, `${baseName}_${dpi}dpi.png`);
     }, 'image/png');
   }
   URL.revokeObjectURL(url);

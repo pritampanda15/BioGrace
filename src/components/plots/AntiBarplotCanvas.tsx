@@ -5,7 +5,7 @@ import type {
   StatsConfig,
   TidyStatRow,
 } from '../../types/biograce';
-import { JOURNAL_PRESETS } from '../../lib/palettes';
+import { resolvePlotTheme } from '../../lib/palettes';
 import { computeBeeswarmOffsets, computeKDE, formatPValue } from '../../lib/statsEngine';
 import { APPLE_SPRINGS } from '../../motion/applePhysics';
 
@@ -28,7 +28,8 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
   darkMode,
   svgRef,
 }) => {
-  const preset = JOURNAL_PRESETS[config.preset];
+  const theme = resolvePlotTheme(config);
+  const { palette } = theme;
   const [hoveredPoint, setHoveredPoint] = useState<{
     group: string;
     value: number;
@@ -38,10 +39,14 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
   } | null>(null);
 
   const paperBg = config.paperExport || !darkMode;
-  const bgFill = paperBg ? '#FFFFFF' : '#13141A';
-  const inkPrimary = paperBg ? '#1D1D1F' : '#F5F5F7';
+  const bgFill = theme.transparentBg ? 'none' : paperBg ? '#FFFFFF' : '#13141A';
+  const strokeHalo = paperBg ? '#FFFFFF' : '#13141A';
+  const inkPrimary = paperBg ? '#111827' : '#F5F5F7';
+  const inkAxis = paperBg ? '#1F2937' : '#E5E7EB';
   const inkSecondary = paperBg ? '#515154' : '#A1A1AA';
   const gridColor = paperBg ? '#CBD5E1' : '#334155';
+  const baseFs = 12 * theme.fontScale;
+  const tickLen = theme.tickDirection === 'in' ? -5.5 : 5.5;
 
   const groups = analysis.groups;
   const plotW = WIDTH - MARGIN.left - MARGIN.right;
@@ -80,18 +85,16 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
   const groupStep = plotW / Math.max(1, groups.length);
   const groupCenterX = (idx: number) => MARGIN.left + (idx + 0.5) * groupStep;
 
-  // Build KDE half-violins and deterministic beeswarm coordinates
   const groupGeometries = useMemo(() => {
     const cloudMaxW = Math.min(62, groupStep * 0.32);
     return groups.map((g, gIdx) => {
       const cx = groupCenterX(gIdx);
-      const color = preset.categorical[gIdx % preset.categorical.length];
+      const color = palette.colors[gIdx % palette.colors.length];
       const kdeLo = Math.max(yMin, g.min - g.sd * 0.45);
       const kdeHi = Math.min(yMax, g.max + g.sd * 0.45);
       const kde = computeKDE(g.values, kdeLo, kdeHi, 56);
       const maxDens = Math.max(1e-9, ...kde.map((p) => p.density));
 
-      // Half-violin path extending rightward from cx + 10
       const cloudBaseX = cx + 10;
       const cloudPath =
         kde.length > 1
@@ -106,7 +109,10 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
           : '';
 
       const pixelYs = g.values.map((v) => toY(v));
-      const spread = config.plotType === 'raincloud' ? Math.min(26, groupStep * 0.15) : Math.min(44, groupStep * 0.24);
+      const spread =
+        config.plotType === 'raincloud'
+          ? Math.min(26, groupStep * 0.15)
+          : Math.min(44, groupStep * 0.24);
       const offsets = computeBeeswarmOffsets(pixelYs, 4.2, spread);
       const groupRows = rows.filter((r) => r.group === g.group);
 
@@ -124,9 +130,8 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
 
       return { g, gIdx, cx, color, cloudPath, points };
     });
-  }, [groups, rows, config.plotType, groupStep, preset.categorical, yMin, yMax]);
+  }, [groups, rows, config.plotType, groupStep, palette.colors, yMin, yMax]);
 
-  // Paired trajectory lines when paired mode is active
   const pairedLines = useMemo(() => {
     if (!analysis.isPaired && config.plotType !== 'paired-slope') return [];
     const bySubject = new Map<string, { gIdx: number; px: number; py: number; value: number }[]>();
@@ -162,7 +167,7 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
         ref={svgRef}
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="w-full h-auto rounded-2xl"
-        style={{ fontFamily: preset.fontFamily }}
+        style={{ fontFamily: theme.fontFamilyCss }}
         xmlns="http://www.w3.org/2000/svg"
       >
         <rect x={0} y={0} width={WIDTH} height={HEIGHT} rx={16} fill={bgFill} />
@@ -172,21 +177,20 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
           x={MARGIN.left}
           y={28}
           fill={inkPrimary}
-          fontSize={16}
+          fontSize={baseFs + 3.5}
           fontWeight={700}
-          letterSpacing="-0.02em"
+          letterSpacing="-0.015em"
         >
           {config.title}
         </text>
-        <text x={MARGIN.left} y={48} fill={inkSecondary} fontSize={11.5}>
-          {`${analysis.omnibus.testName}: ${analysis.omnibus.statisticLabel} = ${analysis.omnibus.statistic.toFixed(2)}, p = ${formatPValue(analysis.omnibus.pValue)}${
+        <text x={MARGIN.left} y={48} fill={inkSecondary} fontSize={baseFs - 0.8}>
+          {`${theme.journal.shortName} · ${analysis.omnibus.testName}: ${analysis.omnibus.statisticLabel} = ${analysis.omnibus.statistic.toFixed(2)}, p = ${formatPValue(analysis.omnibus.pValue)}${
             analysis.omnibus.effectLabel && analysis.omnibus.effectSize !== undefined
               ? ` · ${analysis.omnibus.effectLabel} = ${analysis.omnibus.effectSize.toFixed(2)}`
               : ''
           } · n = ${analysis.totalN}`}
         </text>
 
-        {/* Anti-Barplot Educational Callout Banner when in Barplot Trap mode */}
         {config.plotType === 'barplot-trap' && (
           <g transform={`translate(${WIDTH - MARGIN.right - 292}, 14)`}>
             <rect width={292} height={36} rx={10} fill="#FF3B30" fillOpacity={0.12} stroke="#FF3B30" strokeOpacity={0.35} />
@@ -200,24 +204,47 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
         )}
 
         {/* Horizontal Gridlines */}
-        <g stroke={gridColor} strokeOpacity={preset.gridOpacity} strokeWidth={1}>
+        <g stroke={gridColor} strokeOpacity={0.35} strokeDasharray="3 3" strokeWidth={0.7}>
           {yTicks.map((t) => (
             <line key={`sgy-${t}`} x1={MARGIN.left} x2={MARGIN.left + plotW} y1={toY(t)} y2={toY(t)} />
           ))}
         </g>
 
-        {/* Axes */}
-        <g stroke={inkPrimary} strokeWidth={preset.axisWidth}>
+        {/* Journal-Specific Spines (Open vs 4-Spine Boxed) */}
+        <g stroke={inkAxis} strokeWidth={theme.axesLinewidth}>
           <line x1={MARGIN.left} x2={MARGIN.left + plotW} y1={MARGIN.top + plotH} y2={MARGIN.top + plotH} />
           <line x1={MARGIN.left} x2={MARGIN.left} y1={MARGIN.top} y2={MARGIN.top + plotH} />
+          {theme.topRightSpines && (
+            <>
+              <line x1={MARGIN.left} x2={MARGIN.left + plotW} y1={MARGIN.top} y2={MARGIN.top} />
+              <line x1={MARGIN.left + plotW} x2={MARGIN.left + plotW} y1={MARGIN.top} y2={MARGIN.top + plotH} />
+            </>
+          )}
         </g>
 
-        {/* Y Ticks */}
-        <g fill={inkSecondary} fontSize={11.5}>
+        {/* Y Ticks (Inward vs Outward + Right Mirror Ticks) */}
+        <g fill={inkSecondary} fontSize={baseFs - 0.8}>
           {yTicks.map((t) => (
-            <g key={`syt-${t}`} transform={`translate(${MARGIN.left}, ${toY(t)})`}>
-              <line x2={-5} stroke={inkPrimary} strokeWidth={preset.axisWidth} />
-              <text x={-10} y={4} textAnchor="end">
+            <g key={`syt-${t}`}>
+              <line
+                x1={MARGIN.left}
+                x2={MARGIN.left - tickLen}
+                y1={toY(t)}
+                y2={toY(t)}
+                stroke={inkAxis}
+                strokeWidth={theme.axesLinewidth}
+              />
+              {theme.tickTopRight && (
+                <line
+                  x1={MARGIN.left + plotW}
+                  x2={MARGIN.left + plotW + tickLen}
+                  y1={toY(t)}
+                  y2={toY(t)}
+                  stroke={inkAxis}
+                  strokeWidth={theme.axesLinewidth}
+                />
+              )}
+              <text x={MARGIN.left - 11} y={toY(t) + 4} textAnchor="end">
                 {t}
               </text>
             </g>
@@ -230,7 +257,7 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
           y={HEIGHT - 16}
           textAnchor="middle"
           fill={inkPrimary}
-          fontSize={13}
+          fontSize={baseFs + 0.8}
           fontWeight={600}
         >
           {config.xLabel}
@@ -239,7 +266,7 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
           transform={`translate(22, ${MARGIN.top + plotH / 2}) rotate(-90)`}
           textAnchor="middle"
           fill={inkPrimary}
-          fontSize={13}
+          fontSize={baseFs + 0.8}
           fontWeight={600}
         >
           {config.yLabel}
@@ -256,10 +283,10 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
                 x2={seg.x2}
                 y2={seg.y2}
                 initial={{ pathLength: 0, opacity: 0 }}
-                animate={{ pathLength: 1, opacity: config.plotType === 'paired-slope' ? 0.55 : 0.25 }}
+                animate={{ pathLength: 1, opacity: config.plotType === 'paired-slope' ? 0.58 : 0.25 }}
                 transition={APPLE_SPRINGS.criticallyDamped}
-                stroke={seg.delta >= 0 ? preset.upColor : preset.downColor}
-                strokeWidth={config.plotType === 'paired-slope' ? 1.8 : 1.1}
+                stroke={seg.delta >= 0 ? palette.upColor : palette.downColor}
+                strokeWidth={config.plotType === 'paired-slope' ? theme.lineWidth * 1.45 : theme.lineWidth}
               />
             ))}
           </g>
@@ -279,13 +306,30 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
 
           return (
             <g key={g.group}>
-              {/* X-axis group label & sample size */}
+              <line
+                x1={cx}
+                x2={cx}
+                y1={MARGIN.top + plotH}
+                y2={MARGIN.top + plotH + tickLen}
+                stroke={inkAxis}
+                strokeWidth={theme.axesLinewidth}
+              />
+              {theme.tickTopRight && (
+                <line
+                  x1={cx}
+                  x2={cx}
+                  y1={MARGIN.top}
+                  y2={MARGIN.top - tickLen}
+                  stroke={inkAxis}
+                  strokeWidth={theme.axesLinewidth}
+                />
+              )}
               <text
                 x={cx}
                 y={MARGIN.top + plotH + 22}
                 textAnchor="middle"
                 fill={inkPrimary}
-                fontSize={12.5}
+                fontSize={baseFs + 0.3}
                 fontWeight={600}
               >
                 {g.group}
@@ -295,18 +339,17 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
                 y={MARGIN.top + plotH + 38}
                 textAnchor="middle"
                 fill={inkSecondary}
-                fontSize={10.5}
+                fontSize={baseFs - 1.5}
               >
                 n = {g.n}
               </text>
 
-              {/* MODE 1: Barplot Trap (dynamite bar + SEM) */}
               {config.plotType === 'barplot-trap' && (
                 <g>
                   <motion.rect
                     x={cx - barW / 2}
                     width={barW}
-                    rx={6}
+                    rx={4}
                     initial={{ y: baselineY, height: 0 }}
                     animate={{
                       y: Math.min(meanY, baselineY),
@@ -315,18 +358,17 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
                     transition={APPLE_SPRINGS.criticallyDamped}
                     fill={color}
                     fillOpacity={0.78}
-                    stroke={inkPrimary}
-                    strokeOpacity={0.25}
+                    stroke={inkAxis}
+                    strokeOpacity={0.3}
                     strokeWidth={1}
                   />
-                  {/* SEM error bar */}
                   <line
                     x1={cx}
                     x2={cx}
                     y1={toY(g.mean + g.sem)}
                     y2={toY(g.mean - g.sem)}
                     stroke={inkPrimary}
-                    strokeWidth={1.8}
+                    strokeWidth={theme.lineWidth * 1.4}
                   />
                   <line
                     x1={cx - 10}
@@ -334,7 +376,7 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
                     y1={toY(g.mean + g.sem)}
                     y2={toY(g.mean + g.sem)}
                     stroke={inkPrimary}
-                    strokeWidth={1.8}
+                    strokeWidth={theme.lineWidth * 1.4}
                   />
                   <line
                     x1={cx - 10}
@@ -342,12 +384,11 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
                     y1={toY(g.mean - g.sem)}
                     y2={toY(g.mean - g.sem)}
                     stroke={inkPrimary}
-                    strokeWidth={1.8}
+                    strokeWidth={theme.lineWidth * 1.4}
                   />
                 </g>
               )}
 
-              {/* MODE 2: Raincloud Half-Violin KDE Cloud */}
               {config.plotType === 'raincloud' && cloudPath && (
                 <motion.path
                   d={cloudPath}
@@ -358,11 +399,10 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
                   fill={color}
                   fillOpacity={0.26}
                   stroke={color}
-                  strokeWidth={1.6}
+                  strokeWidth={theme.lineWidth * 1.3}
                 />
               )}
 
-              {/* Tukey Boxplot (Raincloud & Box+Beeswarm) */}
               {(config.plotType === 'raincloud' || config.plotType === 'box-beeswarm') && (
                 <g>
                   <line
@@ -371,7 +411,7 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
                     y1={wHighY}
                     y2={q3Y}
                     stroke={inkPrimary}
-                    strokeWidth={1.35}
+                    strokeWidth={theme.lineWidth * 1.1}
                   />
                   <line
                     x1={boxX + boxW / 2}
@@ -379,7 +419,7 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
                     y1={q1Y}
                     y2={wLowY}
                     stroke={inkPrimary}
-                    strokeWidth={1.35}
+                    strokeWidth={theme.lineWidth * 1.1}
                   />
                   <line
                     x1={boxX + boxW * 0.25}
@@ -387,7 +427,7 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
                     y1={wHighY}
                     y2={wHighY}
                     stroke={inkPrimary}
-                    strokeWidth={1.35}
+                    strokeWidth={theme.lineWidth * 1.1}
                   />
                   <line
                     x1={boxX + boxW * 0.25}
@@ -395,21 +435,21 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
                     y1={wLowY}
                     y2={wLowY}
                     stroke={inkPrimary}
-                    strokeWidth={1.35}
+                    strokeWidth={theme.lineWidth * 1.1}
                   />
                   <motion.rect
                     x={boxX}
                     y={q3Y}
                     width={boxW}
                     height={Math.max(2, q1Y - q3Y)}
-                    rx={4}
+                    rx={3}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={APPLE_SPRINGS.criticallyDamped}
                     fill={color}
                     fillOpacity={0.18}
                     stroke={inkPrimary}
-                    strokeWidth={1.45}
+                    strokeWidth={theme.lineWidth * 1.2}
                   />
                   <line
                     x1={boxX}
@@ -417,22 +457,20 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
                     y1={medY}
                     y2={medY}
                     stroke={inkPrimary}
-                    strokeWidth={2.4}
+                    strokeWidth={theme.lineWidth * 2}
                   />
                 </g>
               )}
 
-              {/* Mean Diamond Indicator */}
               {config.showMeanDiamond && config.plotType !== 'barplot-trap' && (
                 <polygon
                   points={`${boxX + boxW / 2},${meanY - 5.5} ${boxX + boxW / 2 + 5.5},${meanY} ${boxX + boxW / 2},${meanY + 5.5} ${boxX + boxW / 2 - 5.5},${meanY}`}
-                  fill={bgFill}
+                  fill={strokeHalo}
                   stroke={inkPrimary}
-                  strokeWidth={1.6}
+                  strokeWidth={1.5}
                 />
               )}
 
-              {/* Raw Data Points — Spring Morph from Mean (Barplot) -> True Distribution! */}
               {config.showRawPoints && config.plotType !== 'barplot-trap' && (
                 <g>
                   {points.map((pt, idx) => (
@@ -443,7 +481,7 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
                       transition={{ ...APPLE_SPRINGS.plotMorph, delay: Math.min(0.18, idx * 0.008) }}
                       r={4.2}
                       fill={color}
-                      stroke={bgFill}
+                      stroke={strokeHalo}
                       strokeWidth={1.15}
                       style={{ cursor: 'pointer' }}
                       onPointerEnter={() =>
@@ -464,7 +502,7 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
           );
         })}
 
-        {/* Significance Brackets with Adjusted P-values / Stars */}
+        {/* Significance Brackets */}
         {config.showSignificanceBrackets &&
           significantPairs.map((pw, idx) => {
             const idxA = groups.findIndex((g) => g.group === pw.groupA);
@@ -484,15 +522,15 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
                 <path
                   d={`M ${x1} ${y + 7} L ${x1} ${y} L ${x2} ${y} L ${x2} ${y + 7}`}
                   fill="none"
-                  stroke={inkPrimary}
-                  strokeWidth={1.25}
+                  stroke={inkAxis}
+                  strokeWidth={theme.axesLinewidth}
                 />
                 <text
                   x={(x1 + x2) / 2}
                   y={y - 5}
                   textAnchor="middle"
                   fill={pw.significant ? inkPrimary : inkSecondary}
-                  fontSize={10.5}
+                  fontSize={10.5 * theme.fontScale}
                   fontWeight={pw.significant ? 700 : 500}
                 >
                   {label}
