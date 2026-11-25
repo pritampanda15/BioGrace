@@ -55,8 +55,8 @@ USAGE:
   biograce deploy                        Build & deploy static BioGrace Studio to GitHub Pages (gh-pages branch)
   biograce help                          Show this help message
 
-SHARED PUBLICATION STYLE OPTIONS (gmxgrace parity):
-  --journal <id>      nature | science | cell | acs | biophysj | pnas | grace  (alias: --preset)
+SHARED PUBLICATION STYLE OPTIONS:
+  --journal <id>      nature | science | cell | acs | biophysj | pnas  (alias: --preset)
   --palette <id>      okabe-ito | nature-npg | acs-classic | tol-bright | tol-muted | viridis-discrete | grayscale-pub
   --cmap <id>         RdYlBu_r | viridis | plasma | inferno | magma | cividis | coolwarm | Spectral_r | turbo | Blues | YlGnBu | cubehelix_r
   --font <family>     sans-serif | serif | monospace
@@ -150,8 +150,10 @@ function runPlot(positional: string[], flags: Record<string, string | boolean>):
   const config: DEPlotConfig = {
     ...style,
     plotType,
-    title: String(flags.title || `Differential Expression (${JOURNAL_PRESETS[style.preset].name})`),
+    title: String(flags.title || 'Differential Expression'),
     subtitle: '',
+    xLabel: '',
+    yLabel: '',
     fcThreshold,
     fdrThreshold,
     pointSize: 3.6,
@@ -222,6 +224,7 @@ function runStats(positional: string[], flags: Record<string, string | boolean>)
     ...style,
     plotType: 'raincloud',
     title: String(flags.title || 'BioGrace Anti-Barplot Raincloud Summary'),
+    subtitle: '',
     yLabel,
     xLabel,
     isPaired,

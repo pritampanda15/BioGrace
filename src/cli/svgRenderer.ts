@@ -92,7 +92,7 @@ export function renderVolcanoMASvgString(rows: VolcanoRow[], config: DEPlotConfi
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="font-family: ${esc(theme.fontFamilyCss)}">
   <rect width="${W}" height="${H}" rx="16" fill="${bg}"/>
   <text x="${M.left}" y="28" font-size="${(baseFs + 3.5).toFixed(1)}" font-weight="700" fill="#111827">${esc(config.title)}</text>
-  <text x="${M.left}" y="46" font-size="${(baseFs - 1).toFixed(1)}" fill="#515154">${esc(theme.journal.shortName)} · ${theme.widthMm} mm · |log2FC| &gt;= ${config.fcThreshold}, FDR &lt;= ${config.fdrThreshold} · Up ${up} / Down ${down} / NS ${ns}</text>
+  <text x="${M.left}" y="46" font-size="${(baseFs - 1).toFixed(1)}" fill="#515154">|log2FC| &gt;= ${config.fcThreshold}, FDR &lt;= ${config.fdrThreshold} · Up ${up} / Down ${down} / NS ${ns}</text>
   ${
     isVolcano
       ? `<line x1="${toX(config.fcThreshold).toFixed(1)}" x2="${toX(config.fcThreshold).toFixed(1)}" y1="${M.top}" y2="${M.top + plotH}" stroke="#64748B" stroke-dasharray="5 4" stroke-width="${theme.lineWidth}"/>
@@ -183,7 +183,7 @@ export function renderRaincloudSvgString(
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="font-family: ${esc(theme.fontFamilyCss)}">
   <rect width="${W}" height="${H}" rx="16" fill="${bg}"/>
   <text x="${M.left}" y="28" font-size="${(baseFs + 3.5).toFixed(1)}" font-weight="700" fill="#111827">${esc(config.title)}</text>
-  <text x="${M.left}" y="48" font-size="${(baseFs - 0.8).toFixed(1)}" fill="#515154">${esc(theme.journal.shortName)} · ${esc(analysis.primaryTest)} · Omnibus p = ${formatPValue(analysis.omnibus.pValue)} · n = ${analysis.totalN}</text>
+  <text x="${M.left}" y="48" font-size="${(baseFs - 0.8).toFixed(1)}" fill="#515154">${esc(analysis.primaryTest)} · Omnibus p = ${formatPValue(analysis.omnibus.pValue)} · n = ${analysis.totalN}</text>
   <line x1="${M.left}" x2="${M.left + plotW}" y1="${M.top + plotH}" y2="${M.top + plotH}" stroke="#1F2937" stroke-width="${theme.axesLinewidth}"/>
   <line x1="${M.left}" x2="${M.left}" y1="${M.top}" y2="${M.top + plotH}" stroke="#1F2937" stroke-width="${theme.axesLinewidth}"/>
   ${topRightSpinesSvg}

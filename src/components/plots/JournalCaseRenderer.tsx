@@ -1,15 +1,19 @@
 import React from 'react';
 import type { JournalCaseMeta } from '../../lib/journalCasesCatalog';
 import type { PublicationStyleSettings } from '../../types/biograce';
+import type { EditablePlotField } from '../ui/InlinePlotEditor';
 import { resolvePlotTheme } from '../../lib/palettes';
 import { renderCasePartA } from './journalCasesPartA';
 import { renderCasePartB } from './journalCasesPartB';
 
 interface JournalCaseRendererProps {
   item: JournalCaseMeta;
+  customTitle?: string;
+  customSubtitle?: string;
   styleSettings: PublicationStyleSettings;
   darkMode: boolean;
   svgRef: React.RefObject<SVGSVGElement | null>;
+  onEditField: (field: EditablePlotField, label: string, currentValue: string) => void;
 }
 
 const WIDTH = 840;
@@ -17,9 +21,12 @@ const HEIGHT = 560;
 
 export const JournalCaseRenderer: React.FC<JournalCaseRendererProps> = ({
   item,
+  customTitle,
+  customSubtitle,
   styleSettings,
   darkMode,
   svgRef,
+  onEditField,
 }) => {
   const theme = resolvePlotTheme(styleSettings);
   const paperBg = styleSettings.paperExport || !darkMode;
@@ -44,6 +51,8 @@ export const JournalCaseRenderer: React.FC<JournalCaseRendererProps> = ({
   };
 
   const num = Number(item.number);
+  const titleText = customTitle !== undefined ? customTitle : item.title;
+  const subtitleText = customSubtitle !== undefined ? customSubtitle : '';
 
   return (
     <div className="relative w-full select-none">
@@ -56,20 +65,37 @@ export const JournalCaseRenderer: React.FC<JournalCaseRendererProps> = ({
       >
         <rect x={0} y={0} width={WIDTH} height={HEIGHT} rx={16} fill={bgFill} />
 
-        {/* Header */}
+        {/* Clean Publication Header (No journal watermark; click to edit inline) */}
         <text
           x={40}
-          y={28}
+          y={30}
           fill={inkPrimary}
           fontSize={baseFs + 3.5}
           fontWeight={700}
           letterSpacing="-0.015em"
+          style={{ cursor: 'text' }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onEditField('title', 'Figure Title', titleText);
+          }}
         >
-          {`${item.number} · ${item.title}`}
+          {titleText}
         </text>
-        <text x={40} y={46} fill={inkSecondary} fontSize={baseFs - 1}>
-          {`${item.journalSource} archetype · ${theme.journal.shortName} (${theme.widthMm} mm) · ${theme.palette.name}`}
-        </text>
+        {subtitleText && (
+          <text
+            x={40}
+            y={47}
+            fill={inkSecondary}
+            fontSize={baseFs - 1}
+            style={{ cursor: 'text' }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onEditField('subtitle', 'Subtitle', subtitleText);
+            }}
+          >
+            {subtitleText}
+          </text>
+        )}
 
         {num <= 10 ? renderCasePartA(item.id, ctx) : renderCasePartB(item.id, ctx)}
       </svg>

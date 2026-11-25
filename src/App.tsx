@@ -16,6 +16,7 @@ import {
   Layers,
   Moon,
   Palette,
+  Pencil,
   Search,
   Sparkles,
   Sun,
@@ -85,6 +86,11 @@ import {
 import { APPLE_SPRINGS, playAppleTick } from './motion/applePhysics';
 import { AppleSegmentedControl } from './components/ui/AppleSegmentedControl';
 import { FluidSheet } from './components/ui/FluidSheet';
+import {
+  InlinePlotEditor,
+  type ActivePlotEdit,
+  type EditablePlotField,
+} from './components/ui/InlinePlotEditor';
 import { VolcanoMAPlot } from './components/plots/VolcanoMAPlot';
 import { DotPlotChart } from './components/plots/DotPlotChart';
 import { UpSetPlot } from './components/plots/UpSetPlot';
@@ -116,6 +122,8 @@ export function App() {
   const [geneQuery, setGeneQuery] = useState('');
   const [activeCaseId, setActiveCaseId] = useState<JournalCaseId>('03-multi-volcano');
   const [caseCategoryFilter, setCaseCategoryFilter] = useState<'All' | CaseCategory>('All');
+  const [activePlotEdit, setActivePlotEdit] = useState<ActivePlotEdit | null>(null);
+  const [galleryTitles, setGalleryTitles] = useState<Record<string, { title?: string; subtitle?: string }>>({});
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -145,6 +153,8 @@ export function App() {
     paperExport: true,
     title: 'IFN-γ Stimulated Macrophages vs. Control',
     subtitle: '',
+    xLabel: '',
+    yLabel: '',
     fcThreshold: 1.0,
     fdrThreshold: 0.05,
     pointSize: 3.6,
@@ -181,6 +191,7 @@ export function App() {
     transparentBg: false,
     paperExport: true,
     title: statsDemos[0].name,
+    subtitle: '',
     yLabel: statsDemos[0].yLabel,
     xLabel: statsDemos[0].xLabel,
     isPaired: statsDemos[0].isPaired,
@@ -243,6 +254,36 @@ export function App() {
     playAppleTick(soundEnabled, 'select');
   };
 
+  const handleOpenPlotEdit = useCallback(
+    (field: EditablePlotField, label: string, currentValue: string) => {
+      setActivePlotEdit({ field, label, value: currentValue });
+      playAppleTick(soundEnabled, 'select');
+    },
+    [soundEnabled]
+  );
+
+  const handleCommitPlotEdit = useCallback(
+    (field: EditablePlotField, nextValue: string) => {
+      if (studio === 'gallery') {
+        setGalleryTitles((prev) => ({
+          ...prev,
+          [activeCaseId]: {
+            ...prev[activeCaseId],
+            [field === 'subtitle' ? 'subtitle' : 'title']: nextValue,
+          },
+        }));
+      } else if (studio === 'plotter') {
+        setDeConfig((prev) => ({ ...prev, [field]: nextValue }));
+      } else {
+        setStatsConfig((prev) => ({
+          ...prev,
+          [field]: field === 'subtitle' && nextValue.trim() === '' ? '__HIDDEN__' : nextValue,
+        }));
+      }
+    },
+    [studio, activeCaseId]
+  );
+
   // ---------------- Handlers ----------------
   const selectStatsDemo = (demoId: string) => {
     const found = statsDemos.find((d) => d.id === demoId);
@@ -253,6 +294,7 @@ export function App() {
     setStatsConfig((prev) => ({
       ...prev,
       title: found.name,
+      subtitle: '',
       yLabel: found.yLabel,
       xLabel: found.xLabel,
       isPaired: found.isPaired,
@@ -643,7 +685,6 @@ export function App() {
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-xs font-semibold text-[var(--text-primary)] truncate">
-                            <span className="font-mono text-[var(--accent)] mr-1.5">{item.number}</span>
                             {item.title}
                           </span>
                         </div>
@@ -950,7 +991,7 @@ export function App() {
               <div className="flex items-center justify-between">
                 <label className="type-label text-[11px] font-semibold uppercase text-[var(--text-tertiary)] flex items-center gap-1.5">
                   <BookOpen className="w-3.5 h-3.5" />
-                  Journal Presets (7)
+                  Journal Presets ({JOURNAL_PRESET_LIST.length})
                 </label>
                 <span className="text-[10px] font-medium text-[var(--text-tertiary)] tabular-nums">
                   {resolvedTheme.widthMm} mm · {resolvedTheme.topRightSpines ? '4-spine' : 'open'}
@@ -966,8 +1007,6 @@ export function App() {
                       title={journal.description}
                       onPointerDown={() => applyJournalPreset(journal.id)}
                       className={`apple-press p-2 rounded-xl text-left border transition-colors ${
-                        journal.id === 'grace' ? 'col-span-2' : ''
-                      } ${
                         active
                           ? 'bg-[var(--bg-elevated)] border-[var(--accent)] ring-1 ring-[var(--accent)]/30'
                           : 'bg-[var(--bg-elevated)]/55 border-[var(--border-hairline)] hover:bg-[var(--bg-elevated)]'
@@ -1211,12 +1250,12 @@ export function App() {
                   {studio === 'plotter'
                     ? 'DE & Single-Cell Publication Plotter'
                     : studio === 'gallery'
-                    ? `${activeCase.number} · ${activeCase.title}`
+                    ? galleryTitles[activeCase.id]?.title ?? activeCase.title
                     : "Biologist's Statistical Advisor & Anti-Barplot Studio"}
                 </h1>
                 <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-1 tabular-nums">
                   {studio === 'gallery'
-                    ? `${activeCase.journalSource} archetype · ${resolvedTheme.journal.name} (${resolvedTheme.widthMm} mm) · ${resolvedTheme.palette.name}`
+                    ? `${activeCase.category} · ${resolvedTheme.journal.name} (${resolvedTheme.widthMm} mm) · ${resolvedTheme.palette.name}`
                     : `${resolvedTheme.journal.name} (${resolvedTheme.widthMm} mm) · ${resolvedTheme.palette.name} · ${activeStyle.fontFamily} · ${activeStyle.dpi} DPI`}
                 </p>
               </div>
@@ -1284,13 +1323,13 @@ export function App() {
               </div>
             </div>
 
-            {/* Interactive Publication Figure Card */}
+            {/* Interactive Publication Figure Card (Click any title or axis to edit inline) */}
             <motion.div
               key={`${studio}-${studio === 'plotter' ? deConfig.plotType : studio === 'gallery' ? activeCase.id : statsConfig.plotType}`}
               initial={{ opacity: 0.72, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={APPLE_SPRINGS.criticallyDamped}
-              className="material-card rounded-3xl p-3 sm:p-5"
+              className="relative material-card rounded-3xl p-3 sm:p-5"
               style={
                 activeStyle.transparentBg
                   ? {
@@ -1301,12 +1340,98 @@ export function App() {
                   : undefined
               }
             >
+              {/* Inline Floating Glass Plot Text Editor */}
+              <InlinePlotEditor
+                activeEdit={activePlotEdit}
+                onCommit={handleCommitPlotEdit}
+                onClose={() => setActivePlotEdit(null)}
+              />
+
+              {/* Subtle Quick-Edit Hint Bar (outside exported SVG) */}
+              <div className="mb-2.5 px-1 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[var(--text-tertiary)]">
+                <span className="flex items-center gap-1.5">
+                  <Pencil className="w-3 h-3 text-[var(--accent)]" />
+                  Click any title, subtitle, or axis label on the plot to edit inline
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onPointerDown={() =>
+                      handleOpenPlotEdit(
+                        'title',
+                        'Plot Title',
+                        studio === 'gallery'
+                          ? galleryTitles[activeCase.id]?.title ?? activeCase.title
+                          : studio === 'plotter'
+                          ? deConfig.title
+                          : statsConfig.title
+                      )
+                    }
+                    className="apple-press px-2 py-0.5 rounded-lg bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-secondary)] font-medium"
+                  >
+                    Edit Title
+                  </button>
+                  <button
+                    type="button"
+                    onPointerDown={() =>
+                      handleOpenPlotEdit(
+                        'subtitle',
+                        'Subtitle',
+                        studio === 'gallery'
+                          ? galleryTitles[activeCase.id]?.subtitle ?? ''
+                          : studio === 'plotter'
+                          ? deConfig.subtitle
+                          : statsConfig.subtitle === '__HIDDEN__'
+                          ? ''
+                          : statsConfig.subtitle
+                      )
+                    }
+                    className="apple-press px-2 py-0.5 rounded-lg bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-secondary)] font-medium"
+                  >
+                    Edit Subtitle
+                  </button>
+                  {studio !== 'gallery' && (
+                    <>
+                      <button
+                        type="button"
+                        onPointerDown={() =>
+                          handleOpenPlotEdit(
+                            'xLabel',
+                            'X-Axis Label',
+                            studio === 'plotter' ? deConfig.xLabel : statsConfig.xLabel
+                          )
+                        }
+                        className="apple-press px-2 py-0.5 rounded-lg bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-secondary)] font-medium"
+                      >
+                        Edit X-Axis
+                      </button>
+                      <button
+                        type="button"
+                        onPointerDown={() =>
+                          handleOpenPlotEdit(
+                            'yLabel',
+                            'Y-Axis Label',
+                            studio === 'plotter' ? deConfig.yLabel : statsConfig.yLabel
+                          )
+                        }
+                        className="apple-press px-2 py-0.5 rounded-lg bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-secondary)] font-medium"
+                      >
+                        Edit Y-Axis
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
               {studio === 'gallery' ? (
                 <JournalCaseRenderer
                   item={activeCase}
+                  customTitle={galleryTitles[activeCase.id]?.title}
+                  customSubtitle={galleryTitles[activeCase.id]?.subtitle}
                   styleSettings={deConfig}
                   darkMode={darkMode}
                   svgRef={svgRef}
+                  onEditField={handleOpenPlotEdit}
                 />
               ) : studio === 'plotter' ? (
                 <>
@@ -1320,6 +1445,7 @@ export function App() {
                       svgRef={svgRef}
                       onToggleLabel={handleToggleGeneLabel}
                       onMoveLabel={handleMoveGeneLabel}
+                      onEditField={handleOpenPlotEdit}
                     />
                   )}
                   {deConfig.plotType === 'dotplot' && (
@@ -1328,6 +1454,7 @@ export function App() {
                       config={deConfig}
                       darkMode={darkMode}
                       svgRef={svgRef}
+                      onEditField={handleOpenPlotEdit}
                     />
                   )}
                   {deConfig.plotType === 'upset' && (
@@ -1337,6 +1464,7 @@ export function App() {
                       darkMode={darkMode}
                       soundEnabled={soundEnabled}
                       svgRef={svgRef}
+                      onEditField={handleOpenPlotEdit}
                     />
                   )}
                   {deConfig.plotType === 'lollipop' && (
@@ -1345,6 +1473,7 @@ export function App() {
                       config={deConfig}
                       darkMode={darkMode}
                       svgRef={svgRef}
+                      onEditField={handleOpenPlotEdit}
                     />
                   )}
                 </>
@@ -1355,6 +1484,7 @@ export function App() {
                   config={statsConfig}
                   darkMode={darkMode}
                   svgRef={svgRef}
+                  onEditField={handleOpenPlotEdit}
                 />
               )}
             </motion.div>

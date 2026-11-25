@@ -10,8 +10,7 @@ export type JournalPresetId =
   | 'cell'
   | 'acs'
   | 'biophysj'
-  | 'pnas'
-  | 'grace';
+  | 'pnas';
 
 export type PaletteId =
   | 'okabe-ito'
@@ -149,6 +148,8 @@ export interface DEPlotConfig extends PublicationStyleSettings {
   plotType: DEPlotType;
   title: string;
   subtitle: string;
+  xLabel: string;
+  yLabel: string;
   fcThreshold: number;
   fdrThreshold: number;
   pointSize: number;
@@ -248,6 +249,7 @@ export interface StatisticalRecommendation {
 export interface StatsConfig extends PublicationStyleSettings {
   plotType: StatsPlotType;
   title: string;
+  subtitle: string;
   yLabel: string;
   xLabel: string;
   isPaired: boolean;

@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { DEPlotConfig, VolcanoRow } from '../../types/biograce';
+import type { EditablePlotField } from '../ui/InlinePlotEditor';
 import { resolvePlotTheme } from '../../lib/palettes';
 import { APPLE_SPRINGS, playAppleTick } from '../../motion/applePhysics';
 
@@ -13,6 +14,7 @@ interface VolcanoMAPlotProps {
   svgRef: React.RefObject<SVGSVGElement | null>;
   onToggleLabel: (gene: string) => void;
   onMoveLabel: (gene: string, dx: number, dy: number) => void;
+  onEditField: (field: EditablePlotField, label: string, currentValue: string) => void;
 }
 
 const WIDTH = 840;
@@ -28,6 +30,7 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
   svgRef,
   onToggleLabel,
   onMoveLabel,
+  onEditField,
 }) => {
   const theme = resolvePlotTheme(config);
   const { palette } = theme;
@@ -209,7 +212,7 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
       >
         <rect x={0} y={0} width={WIDTH} height={HEIGHT} rx={16} fill={bgFill} />
 
-        {/* Title & Subtitle */}
+        {/* Title & Subtitle (Click to Edit Inline) */}
         <text
           x={MARGIN.left}
           y={28}
@@ -217,12 +220,30 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
           fontSize={baseFs + 3.5}
           fontWeight={700}
           letterSpacing="-0.015em"
+          style={{ cursor: 'text' }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onEditField('title', 'Plot Title', config.title);
+          }}
         >
           {config.title}
         </text>
-        <text x={MARGIN.left} y={45} fill={inkSecondary} fontSize={baseFs - 1}>
+        <text
+          x={MARGIN.left}
+          y={45}
+          fill={inkSecondary}
+          fontSize={baseFs - 1}
+          style={{ cursor: 'text' }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            const cur =
+              config.subtitle ||
+              `|log2FC| ≥ ${config.fcThreshold.toFixed(1)}, FDR ≤ ${config.fdrThreshold}`;
+            onEditField('subtitle', 'Subtitle', cur);
+          }}
+        >
           {config.subtitle ||
-            `${theme.journal.shortName} · ${theme.widthMm} mm · |log2FC| ≥ ${config.fcThreshold.toFixed(1)}, FDR ≤ ${config.fdrThreshold}`}
+            `|log2FC| ≥ ${config.fcThreshold.toFixed(1)}, FDR ≤ ${config.fdrThreshold}`}
         </text>
 
         {/* Legend */}
@@ -377,8 +398,17 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
           fill={inkPrimary}
           fontSize={baseFs + 0.5}
           fontWeight={600}
+          style={{ cursor: 'text' }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            const cur =
+              config.xLabel ||
+              (mode === 'volcano' ? 'log2 Fold Change' : 'log10 Mean Expression (baseMean)');
+            onEditField('xLabel', 'X-Axis Label', cur);
+          }}
         >
-          {mode === 'volcano' ? 'log2 Fold Change' : 'log10 Mean Expression (baseMean)'}
+          {config.xLabel ||
+            (mode === 'volcano' ? 'log2 Fold Change' : 'log10 Mean Expression (baseMean)')}
         </text>
         <text
           transform={`translate(22, ${MARGIN.top + plotH / 2}) rotate(-90)`}
@@ -386,8 +416,17 @@ export const VolcanoMAPlot: React.FC<VolcanoMAPlotProps> = ({
           fill={inkPrimary}
           fontSize={baseFs + 0.5}
           fontWeight={600}
+          style={{ cursor: 'text' }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            const cur =
+              config.yLabel ||
+              (mode === 'volcano' ? '−log10 Adjusted P-value (FDR)' : 'log2 Fold Change');
+            onEditField('yLabel', 'Y-Axis Label', cur);
+          }}
         >
-          {mode === 'volcano' ? '−log10 Adjusted P-value (FDR)' : 'log2 Fold Change'}
+          {config.yLabel ||
+            (mode === 'volcano' ? '−log10 Adjusted P-value (FDR)' : 'log2 Fold Change')}
         </text>
 
         {/* Data Points */}

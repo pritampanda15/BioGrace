@@ -98,9 +98,9 @@ ${
   ) +
   labs(
     title = "${config.title}",
-    subtitle = "${t.journal.shortName} · |log2FC| >= ${config.fcThreshold}, FDR <= ${config.fdrThreshold}",
-    x = "${isVolcano ? 'log2 Fold Change' : 'log10 Mean Expression (baseMean)'}",
-    y = "${isVolcano ? '-log10 Adjusted P-value (FDR)' : 'log2 Fold Change'}",
+    subtitle = "|log2FC| >= ${config.fcThreshold}, FDR <= ${config.fdrThreshold}",
+    x = "${config.xLabel || (isVolcano ? 'log2 Fold Change' : 'log10 Mean Expression (baseMean)')}",
+    y = "${config.yLabel || (isVolcano ? '-log10 Adjusted P-value (FDR)' : 'log2 Fold Change')}",
     color = NULL
   ) +
   ${rBaseTheme}(base_size = ${config.fontSizePt.toFixed(1)}, base_family = "${rFont}") +

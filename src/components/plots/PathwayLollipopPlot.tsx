@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { DEPlotConfig, PathwayRow } from '../../types/biograce';
+import type { EditablePlotField } from '../ui/InlinePlotEditor';
 import { resolvePlotTheme } from '../../lib/palettes';
 import { APPLE_SPRINGS } from '../../motion/applePhysics';
 
@@ -9,6 +10,7 @@ interface PathwayLollipopPlotProps {
   config: DEPlotConfig;
   darkMode: boolean;
   svgRef: React.RefObject<SVGSVGElement | null>;
+  onEditField: (field: EditablePlotField, label: string, currentValue: string) => void;
 }
 
 const WIDTH = 840;
@@ -30,6 +32,7 @@ export const PathwayLollipopPlot: React.FC<PathwayLollipopPlotProps> = ({
   config,
   darkMode,
   svgRef,
+  onEditField,
 }) => {
   const theme = resolvePlotTheme(config);
   const { palette } = theme;
@@ -75,12 +78,27 @@ export const PathwayLollipopPlot: React.FC<PathwayLollipopPlotProps> = ({
           fontSize={baseFs + 3.5}
           fontWeight={700}
           letterSpacing="-0.015em"
+          style={{ cursor: 'text' }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onEditField('title', 'Plot Title', config.title || 'Ranked Pathway Enrichment');
+          }}
         >
-          {config.title || 'Ranked Pathway Enrichment (GSEA Lollipop)'}
+          {config.title || 'Ranked Pathway Enrichment'}
         </text>
-        <text x={32} y={46} fill={inkSecondary} fontSize={baseFs - 1}>
-          {config.subtitle ||
-            `${theme.journal.shortName} · Normalized Enrichment Score (NES) · Dot area scaled by gene count`}
+        <text
+          x={32}
+          y={46}
+          fill={inkSecondary}
+          fontSize={baseFs - 1}
+          style={{ cursor: 'text' }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            const cur = config.subtitle || 'Normalized Enrichment Score (NES) · Dot area scaled by gene count';
+            onEditField('subtitle', 'Subtitle', cur);
+          }}
+        >
+          {config.subtitle || 'Normalized Enrichment Score (NES) · Dot area scaled by gene count'}
         </text>
 
         {/* Vertical Grid */}
@@ -154,8 +172,13 @@ export const PathwayLollipopPlot: React.FC<PathwayLollipopPlotProps> = ({
           fill={inkPrimary}
           fontSize={baseFs + 0.5}
           fontWeight={600}
+          style={{ cursor: 'text' }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onEditField('xLabel', 'X-Axis Label', config.xLabel || 'Normalized Enrichment Score (NES)');
+          }}
         >
-          Normalized Enrichment Score (NES)
+          {config.xLabel || 'Normalized Enrichment Score (NES)'}
         </text>
 
         {/* Lollipop Stems & Dots */}

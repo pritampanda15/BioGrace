@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { DEPlotConfig, DotPlotRow } from '../../types/biograce';
+import type { EditablePlotField } from '../ui/InlinePlotEditor';
 import { resolvePlotTheme, sampleRamp } from '../../lib/palettes';
 
 interface DotPlotChartProps {
@@ -7,6 +8,7 @@ interface DotPlotChartProps {
   config: DEPlotConfig;
   darkMode: boolean;
   svgRef: React.RefObject<SVGSVGElement | null>;
+  onEditField: (field: EditablePlotField, label: string, currentValue: string) => void;
 }
 
 const WIDTH = 840;
@@ -18,6 +20,7 @@ export const DotPlotChart: React.FC<DotPlotChartProps> = ({
   config,
   darkMode,
   svgRef,
+  onEditField,
 }) => {
   const theme = resolvePlotTheme(config);
   const { palette, colormap } = theme;
@@ -83,12 +86,27 @@ export const DotPlotChart: React.FC<DotPlotChartProps> = ({
           fontSize={baseFs + 3.5}
           fontWeight={700}
           letterSpacing="-0.015em"
+          style={{ cursor: 'text' }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onEditField('title', 'Plot Title', config.title || 'Single-Cell Canonical Marker Dot Plot');
+          }}
         >
           {config.title || 'Single-Cell Canonical Marker Dot Plot'}
         </text>
-        <text x={MARGIN.left} y={46} fill={inkSecondary} fontSize={baseFs - 1}>
-          {config.subtitle ||
-            `${theme.journal.shortName} · ${colormap.name} colormap · ${genes.length} markers × ${clusters.length} populations`}
+        <text
+          x={MARGIN.left}
+          y={46}
+          fill={inkSecondary}
+          fontSize={baseFs - 1}
+          style={{ cursor: 'text' }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            const cur = config.subtitle || `${genes.length} marker genes × ${clusters.length} cell populations`;
+            onEditField('subtitle', 'Subtitle', cur);
+          }}
+        >
+          {config.subtitle || `${genes.length} marker genes × ${clusters.length} cell populations`}
         </text>
 
         {/* Plot Frame (respects journal axis linewidth & 4-spine vs subtle frame) */}

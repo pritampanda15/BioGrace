@@ -5,6 +5,7 @@ import type {
   StatsConfig,
   TidyStatRow,
 } from '../../types/biograce';
+import type { EditablePlotField } from '../ui/InlinePlotEditor';
 import { resolvePlotTheme } from '../../lib/palettes';
 import { computeBeeswarmOffsets, computeKDE, formatPValue } from '../../lib/statsEngine';
 import { APPLE_SPRINGS } from '../../motion/applePhysics';
@@ -15,6 +16,7 @@ interface AntiBarplotCanvasProps {
   config: StatsConfig;
   darkMode: boolean;
   svgRef: React.RefObject<SVGSVGElement | null>;
+  onEditField: (field: EditablePlotField, label: string, currentValue: string) => void;
 }
 
 const WIDTH = 840;
@@ -27,6 +29,7 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
   config,
   darkMode,
   svgRef,
+  onEditField,
 }) => {
   const theme = resolvePlotTheme(config);
   const { palette } = theme;
@@ -65,8 +68,9 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
     const rawMin = allVals.length ? Math.min(...allVals) : 0;
     const rawMax = allVals.length ? Math.max(...allVals) : 100;
     const span = Math.max(1e-3, rawMax - rawMin);
-    const lo = config.plotType === 'barplot-trap' ? Math.min(0, rawMin - span * 0.08) : rawMin - span * 0.14;
-    const topPad = significantPairs.length > 0 ? 0.24 + significantPairs.length * 0.095 : 0.14;
+    const lo =
+      config.plotType === 'barplot-trap' ? Math.min(0, rawMin - span * 0.08) : rawMin - span * 0.22;
+    const topPad = significantPairs.length > 0 ? 0.28 + significantPairs.length * 0.095 : 0.22;
     const hi = rawMax + span * topPad;
 
     const tickCount = 5;
@@ -90,9 +94,15 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
     return groups.map((g, gIdx) => {
       const cx = groupCenterX(gIdx);
       const color = palette.colors[gIdx % palette.colors.length];
-      const kdeLo = Math.max(yMin, g.min - g.sd * 0.45);
-      const kdeHi = Math.min(yMax, g.max + g.sd * 0.45);
-      const kde = computeKDE(g.values, kdeLo, kdeHi, 56);
+      const kdeLo = Math.max(yMin + (yMax - yMin) * 0.01, g.min - g.sd * 0.65);
+      const kdeHi = Math.min(yMax - (yMax - yMin) * 0.01, g.max + g.sd * 0.65);
+      const kdeRaw = computeKDE(g.values, kdeLo, kdeHi, 56);
+      // Taper endpoints smoothly to zero so half-violin tails never appear flat-chopped
+      const kde = kdeRaw.map((p, i) => {
+        const edge = Math.min(i, kdeRaw.length - 1 - i);
+        const taper = edge < 4 ? edge / 4 : 1;
+        return { y: p.y, density: p.density * taper };
+      });
       const maxDens = Math.max(1e-9, ...kde.map((p) => p.density));
 
       const cloudBaseX = cx + 10;
@@ -172,7 +182,7 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
       >
         <rect x={0} y={0} width={WIDTH} height={HEIGHT} rx={16} fill={bgFill} />
 
-        {/* Title & Omnibus Subtitle */}
+        {/* Title & Omnibus Subtitle (Clean publication text — click to edit inline) */}
         <text
           x={MARGIN.left}
           y={28}
@@ -180,16 +190,37 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
           fontSize={baseFs + 3.5}
           fontWeight={700}
           letterSpacing="-0.015em"
+          style={{ cursor: 'text' }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onEditField('title', 'Plot Title', config.title);
+          }}
         >
           {config.title}
         </text>
-        <text x={MARGIN.left} y={48} fill={inkSecondary} fontSize={baseFs - 0.8}>
-          {`${theme.journal.shortName} · ${analysis.omnibus.testName}: ${analysis.omnibus.statisticLabel} = ${analysis.omnibus.statistic.toFixed(2)}, p = ${formatPValue(analysis.omnibus.pValue)}${
+        {(() => {
+          const defaultSub = `${analysis.omnibus.testName}: ${analysis.omnibus.statisticLabel} = ${analysis.omnibus.statistic.toFixed(2)}, p = ${formatPValue(analysis.omnibus.pValue)}${
             analysis.omnibus.effectLabel && analysis.omnibus.effectSize !== undefined
               ? ` · ${analysis.omnibus.effectLabel} = ${analysis.omnibus.effectSize.toFixed(2)}`
               : ''
-          } · n = ${analysis.totalN}`}
-        </text>
+          } · n = ${analysis.totalN}`;
+          const shownSub = config.subtitle === '__HIDDEN__' ? '' : config.subtitle || defaultSub;
+          return (
+            <text
+              x={MARGIN.left}
+              y={48}
+              fill={inkSecondary}
+              fontSize={baseFs - 0.8}
+              style={{ cursor: 'text' }}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                onEditField('subtitle', 'Subtitle', shownSub);
+              }}
+            >
+              {shownSub}
+            </text>
+          );
+        })()}
 
         {config.plotType === 'barplot-trap' && (
           <g transform={`translate(${WIDTH - MARGIN.right - 292}, 14)`}>
@@ -251,7 +282,7 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
           ))}
         </g>
 
-        {/* Axis Titles */}
+        {/* Axis Titles (Click to Edit Inline) */}
         <text
           x={MARGIN.left + plotW / 2}
           y={HEIGHT - 16}
@@ -259,6 +290,11 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
           fill={inkPrimary}
           fontSize={baseFs + 0.8}
           fontWeight={600}
+          style={{ cursor: 'text' }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onEditField('xLabel', 'X-Axis Label', config.xLabel);
+          }}
         >
           {config.xLabel}
         </text>
@@ -268,6 +304,11 @@ export const AntiBarplotCanvas: React.FC<AntiBarplotCanvasProps> = ({
           fill={inkPrimary}
           fontSize={baseFs + 0.8}
           fontWeight={600}
+          style={{ cursor: 'text' }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onEditField('yLabel', 'Y-Axis Label', config.yLabel);
+          }}
         >
           {config.yLabel}
         </text>

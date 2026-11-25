@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { DEPlotConfig, UpSetItem } from '../../types/biograce';
+import type { EditablePlotField } from '../ui/InlinePlotEditor';
 import { resolvePlotTheme } from '../../lib/palettes';
 import { APPLE_SPRINGS, playAppleTick } from '../../motion/applePhysics';
 
@@ -10,6 +11,7 @@ interface UpSetPlotProps {
   darkMode: boolean;
   soundEnabled: boolean;
   svgRef: React.RefObject<SVGSVGElement | null>;
+  onEditField: (field: EditablePlotField, label: string, currentValue: string) => void;
 }
 
 const WIDTH = 840;
@@ -21,6 +23,7 @@ export const UpSetPlot: React.FC<UpSetPlotProps> = ({
   darkMode,
   soundEnabled,
   svgRef,
+  onEditField,
 }) => {
   const theme = resolvePlotTheme(config);
   const { palette } = theme;
@@ -92,12 +95,27 @@ export const UpSetPlot: React.FC<UpSetPlotProps> = ({
           fontSize={baseFs + 3.5}
           fontWeight={700}
           letterSpacing="-0.015em"
+          style={{ cursor: 'text' }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onEditField('title', 'Plot Title', config.title || 'DEG Set Intersections');
+          }}
         >
-          {config.title || 'DEG Set Intersections (UpSet Plot)'}
+          {config.title || 'DEG Set Intersections'}
         </text>
-        <text x={32} y={46} fill={inkSecondary} fontSize={baseFs - 1}>
-          {config.subtitle ||
-            `${theme.journal.shortName} · ${items.length} features across ${setTotals.length} contrasts · Click any bar to inspect shared genes`}
+        <text
+          x={32}
+          y={46}
+          fill={inkSecondary}
+          fontSize={baseFs - 1}
+          style={{ cursor: 'text' }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            const cur = config.subtitle || `${items.length} unique features across ${setTotals.length} contrasts`;
+            onEditField('subtitle', 'Subtitle', cur);
+          }}
+        >
+          {config.subtitle || `${items.length} unique features across ${setTotals.length} contrasts`}
         </text>
 
         {/* Top Bar Axes (respecting 4-spine boxed vs open) */}

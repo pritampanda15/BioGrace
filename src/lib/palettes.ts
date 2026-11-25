@@ -157,26 +157,6 @@ export const JOURNAL_PRESETS: Record<JournalPresetId, JournalPreset> = {
     defaultPalette: 'tol-bright',
     defaultPanelLabels: 'uppercase',
   },
-  grace: {
-    id: 'grace',
-    name: 'Modern xmgrace',
-    shortName: 'xmgrace',
-    description: 'Classic xmgrace feel modernized for publication (110 / 185 mm, 4-spine boxed frame, bold inward ticks)',
-    widthsMm: { single: 110.0, one_half: 145.0, double: 185.0 },
-    fontFamily: 'sans-serif',
-    fontSize: 9.0,
-    titleSize: 10.5,
-    labelSize: 9.5,
-    tickSize: 8.5,
-    legendSize: 8.5,
-    lineWidth: 1.4,
-    axesLinewidth: 1.0,
-    tickDirection: 'in',
-    topRightSpines: true,
-    tickTopRight: true,
-    defaultPalette: 'okabe-ito',
-    defaultPanelLabels: 'parens_upper',
-  },
 };
 
 export const JOURNAL_PRESET_LIST = Object.values(JOURNAL_PRESETS);
