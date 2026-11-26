@@ -840,8 +840,26 @@ export function App() {
         <header className="sticky top-0 z-30 material-toolbar">
           <div className="max-w-[1460px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0A84FF] via-[#5E5CE6] to-[#30D158] flex items-center justify-center shadow-sm shrink-0">
-                <Sparkles className="w-5 h-5 text-white" />
+              <div className="w-9 h-9 rounded-xl overflow-hidden shadow-sm shrink-0">
+                <svg viewBox="0 0 64 64" fill="none" className="w-full h-full" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="biograce-brand-grad" x1="0" y1="0" x2="0" y2="64" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stopColor="#0A84FF" />
+                      <stop offset="100%" stopColor="#30D158" />
+                    </linearGradient>
+                  </defs>
+                  <rect width="64" height="64" rx="16" fill="url(#biograce-brand-grad)" />
+                  <path
+                    d="M13 48C20 37 26 24 33 24C40 24 44 37 51 48"
+                    stroke="white"
+                    strokeWidth="2.6"
+                    strokeLinecap="round"
+                    strokeOpacity="0.45"
+                  />
+                  <circle cx="22" cy="39" r="6.5" fill="white" fillOpacity="0.95" />
+                  <circle cx="35" cy="23" r="7.5" fill="white" />
+                  <circle cx="46" cy="37" r="5.5" fill="#E0F2FE" />
+                </svg>
               </div>
               <div className="truncate">
                 <div className="flex items-center gap-2">
