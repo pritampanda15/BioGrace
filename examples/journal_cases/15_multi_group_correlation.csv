@@ -1,0 +1,7 @@
+cohort,var1,var2,r,pvalue
+Healthy,IFNG,CXCL10,0.68,0.002
+Healthy,IFNG,IL10,0.42,0.041
+Healthy,TNF,IL6,0.55,0.011
+Disease,IFNG,CXCL10,0.91,1.2e-06
+Disease,IFNG,IL10,-0.62,0.004
+Disease,TNF,IL6,0.84,4.5e-05

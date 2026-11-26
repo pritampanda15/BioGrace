@@ -1,18 +1,29 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Check, Copy, Download, FileSpreadsheet, Play, Table2 } from 'lucide-react';
 import {
   CSV_TEMPLATE_LIST,
   CSV_TEMPLATES,
   type CsvTemplateKey,
 } from '../../lib/csvTemplates';
+import {
+  JOURNAL_CASE_CSV_LIST,
+  JOURNAL_CASE_CSV_TEMPLATES,
+} from '../../lib/journalCasesCsvTemplates';
+import type { JournalCaseId } from '../../lib/journalCasesCatalog';
 import { exportTextFile } from '../../lib/exporters';
 import { playAppleTick } from '../../motion/applePhysics';
 
+export type AnyCsvGuideKey = CsvTemplateKey | JournalCaseId;
+
 interface CsvFormatGuideProps {
-  activeKey: CsvTemplateKey;
+  activeKey: AnyCsvGuideKey;
   soundEnabled: boolean;
-  onTestLoadCsv: (csvText: string, filename: string, targetKey: CsvTemplateKey) => void;
+  onTestLoadCsv?: (csvText: string, filename: string, targetKey: CsvTemplateKey) => void;
   showSelector?: boolean;
+}
+
+function isStudioCsvKey(key: AnyCsvGuideKey): key is CsvTemplateKey {
+  return key in CSV_TEMPLATES;
 }
 
 export const CsvFormatGuide: React.FC<CsvFormatGuideProps> = ({
@@ -21,11 +32,19 @@ export const CsvFormatGuide: React.FC<CsvFormatGuideProps> = ({
   onTestLoadCsv,
   showSelector = false,
 }) => {
-  const [selectedKey, setSelectedKey] = useState<CsvTemplateKey>(activeKey);
+  const [selectedKey, setSelectedKey] = useState<AnyCsvGuideKey>(activeKey);
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => {
+    setSelectedKey(activeKey);
+  }, [activeKey]);
+
   const effectiveKey = showSelector ? selectedKey : activeKey;
-  const spec = CSV_TEMPLATES[effectiveKey] ?? CSV_TEMPLATES.volcano;
+  const spec = isStudioCsvKey(effectiveKey)
+    ? CSV_TEMPLATES[effectiveKey]
+    : JOURNAL_CASE_CSV_TEMPLATES[effectiveKey] ?? CSV_TEMPLATES.volcano;
+
+  const canDirectLoad = isStudioCsvKey(effectiveKey) && Boolean(onTestLoadCsv);
 
   const previewTable = useMemo(() => {
     const lines = spec.sampleCsv.trim().split('\n');
@@ -47,18 +66,27 @@ export const CsvFormatGuide: React.FC<CsvFormatGuideProps> = ({
       {showSelector && (
         <div>
           <label className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)] block mb-1.5">
-            Browse CSV Template by Plot Type (16 Formats)
+            Browse CSV Template by Plot Type (All 36 Formats)
           </label>
           <select
             value={selectedKey}
-            onChange={(e) => setSelectedKey(e.target.value as CsvTemplateKey)}
+            onChange={(e) => setSelectedKey(e.target.value as AnyCsvGuideKey)}
             className="w-full px-3 py-2 rounded-xl text-xs font-medium bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--text-primary)]"
           >
-            {CSV_TEMPLATE_LIST.map((t) => (
-              <option key={t.key} value={t.key}>
-                {t.label}
-              </option>
-            ))}
+            <optgroup label="Interactive Plotter & Stat Advisor (16 Live Upload Formats)">
+              {CSV_TEMPLATE_LIST.map((t) => (
+                <option key={t.key} value={t.key}>
+                  {t.label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="20 Open-Source Top-Journal Figures (01–20)">
+              {JOURNAL_CASE_CSV_LIST.map((t) => (
+                <option key={t.key} value={t.key}>
+                  {t.label}
+                </option>
+              ))}
+            </optgroup>
           </select>
         </div>
       )}
@@ -79,17 +107,19 @@ export const CsvFormatGuide: React.FC<CsvFormatGuideProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
-          <button
-            type="button"
-            onPointerDown={() => {
-              onTestLoadCsv(spec.sampleCsv, spec.filename, spec.key);
-              playAppleTick(soundEnabled, 'commit');
-            }}
-            className="apple-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[var(--accent)] text-white"
-          >
-            <Play className="w-3 h-3" />
-            Load Test CSV
-          </button>
+          {canDirectLoad && (
+            <button
+              type="button"
+              onPointerDown={() => {
+                onTestLoadCsv?.(spec.sampleCsv, spec.filename, effectiveKey as CsvTemplateKey);
+                playAppleTick(soundEnabled, 'commit');
+              }}
+              className="apple-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[var(--accent)] text-white"
+            >
+              <Play className="w-3 h-3" />
+              Load Test CSV
+            </button>
+          )}
 
           <button
             type="button"

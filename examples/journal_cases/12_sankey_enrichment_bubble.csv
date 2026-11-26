@@ -1,0 +1,10 @@
+gene,pathway,gene_ratio,padj,count
+STAT1,IFN-g Response,0.44,6.3e-15,62
+CXCL10,IFN-g Response,0.44,6.3e-15,62
+IRF1,IFN-g Response,0.44,6.3e-15,62
+STAT1,JAK-STAT Signaling,0.36,2.5e-11,44
+IRF1,Antiviral Defense,0.31,1.6e-09,38
+GBP1,Antiviral Defense,0.31,1.6e-09,38
+MRC1,M2 Tissue Repair,0.28,3.1e-08,32
+ARG1,M2 Tissue Repair,0.28,3.1e-08,32
+PPARG,Lipid Metabolism,0.22,6.3e-06,24

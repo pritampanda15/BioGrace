@@ -1,0 +1,7 @@
+cohort,cell_state,outcome,freq
+Primary,Effector,CR_PR,42
+Primary,Memory,CR_PR,19
+Primary,Exhausted,Non_Responder,28
+Metastatic,Effector,CR_PR,14
+Metastatic,Memory,CR_PR,18
+Metastatic,Exhausted,Non_Responder,36

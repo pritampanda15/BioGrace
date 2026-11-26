@@ -1,0 +1,13 @@
+taxon,sample,zscore
+Akkermansia,HC-1,1.62
+Akkermansia,HC-2,1.24
+Akkermansia,DIS-1,-1.48
+Akkermansia,DIS-2,-1.85
+Bacteroides,HC-1,-0.92
+Bacteroides,HC-2,-0.64
+Bacteroides,DIS-1,1.35
+Bacteroides,DIS-2,1.72
+Prevotella,HC-1,-1.10
+Prevotella,HC-2,-0.45
+Prevotella,DIS-1,0.88
+Prevotella,DIS-2,1.64

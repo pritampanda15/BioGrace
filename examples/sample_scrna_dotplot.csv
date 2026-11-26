@@ -1,0 +1,17 @@
+gene,cluster,avg_expr,pct_expr
+IL7R,CD4 T,2.45,89
+IL7R,CD8 T,0.72,31
+IL7R,B Cell,-0.35,4
+IL7R,Mono,-0.41,3
+CD8A,CD4 T,-0.28,5
+CD8A,CD8 T,2.62,92
+CD8A,B Cell,-0.42,2
+CD8A,Mono,-0.39,3
+MS4A1,CD4 T,-0.33,2
+MS4A1,CD8 T,-0.31,2
+MS4A1,B Cell,2.58,95
+MS4A1,Mono,-0.40,4
+LYZ,CD4 T,-0.25,6
+LYZ,CD8 T,-0.22,5
+LYZ,B Cell,-0.18,8
+LYZ,Mono,2.84,98

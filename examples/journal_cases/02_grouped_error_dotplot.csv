@@ -1,0 +1,13 @@
+genotype,treatment,value
+Wild-Type,Vehicle,18.2
+Wild-Type,Vehicle,17.5
+Wild-Type,IFN-g,46.4
+Wild-Type,IFN-g,44.8
+Wild-Type,IFN-g+Inh,25.9
+Wild-Type,IFN-g+Inh,27.1
+STAT1_KO,Vehicle,16.1
+STAT1_KO,Vehicle,15.4
+STAT1_KO,IFN-g,20.2
+STAT1_KO,IFN-g,19.5
+STAT1_KO,IFN-g+Inh,17.4
+STAT1_KO,IFN-g+Inh,16.8

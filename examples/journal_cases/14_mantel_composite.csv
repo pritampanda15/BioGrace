@@ -1,0 +1,9 @@
+community,env_var,mantel_r,mantel_p
+Taxonomic_16S,pH,0.52,0.001
+Taxonomic_16S,Temp,0.34,0.012
+Taxonomic_16S,TOC,0.18,0.14
+Functional_KO,pH,0.44,0.004
+Functional_KO,NO3,0.49,0.002
+Functional_KO,Salinity,0.28,0.038
+Metabolome,TOC,0.58,0.001
+Metabolome,NH4,0.41,0.006

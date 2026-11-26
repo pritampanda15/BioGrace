@@ -1,0 +1,11 @@
+from,to,module,weight
+STAT1,IRF1,IFN_Antiviral,0.96
+STAT1,CXCL10,IFN_Antiviral,0.92
+STAT1,GBP1,IFN_Antiviral,0.89
+IRF1,ISG15,IFN_Antiviral,0.84
+MYC,CDK4,Cell_Cycle,0.94
+MYC,E2F1,Cell_Cycle,0.91
+CDK4,MKI67,Cell_Cycle,0.87
+MRC1,ARG1,Tissue_Repair,0.90
+MRC1,CD163,Tissue_Repair,0.88
+STAT1,MYC,Cross_Module,0.45

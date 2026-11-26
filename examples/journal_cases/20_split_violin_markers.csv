@@ -1,0 +1,17 @@
+marker,condition,expression
+CXCL10,Control,1.9
+CXCL10,Control,2.3
+CXCL10,Treated,4.6
+CXCL10,Treated,5.1
+STAT1,Control,2.4
+STAT1,Control,2.8
+STAT1,Treated,4.3
+STAT1,Treated,4.7
+GZMB,Control,1.7
+GZMB,Control,2.1
+GZMB,Treated,4.0
+GZMB,Treated,4.5
+MRC1,Control,4.4
+MRC1,Control,4.8
+MRC1,Treated,1.6
+MRC1,Treated,2.0

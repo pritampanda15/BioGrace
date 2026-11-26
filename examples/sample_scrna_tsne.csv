@@ -1,0 +1,11 @@
+cell,tSNE_1,tSNE_2,cluster,condition,IL7R,CD8A,NKG7,LYZ
+C01,-22.4,18.2,CD4 T,Control,4.5,0.1,0.2,0.0
+C02,-20.1,19.5,CD4 T,Treated,4.2,0.2,0.3,0.1
+C03,-24.0,16.8,CD4 T,Control,4.8,0.0,0.1,0.0
+C04,-8.2,27.5,CD8 T,Control,0.4,4.7,2.1,0.0
+C05,-6.4,29.1,CD8 T,Treated,0.3,4.9,2.8,0.1
+C06,14.2,25.8,NK Cell,Control,0.1,0.3,5.2,0.1
+C07,15.8,24.1,NK Cell,Treated,0.0,0.2,5.6,0.0
+C08,8.1,-23.5,CD14 Mono,Control,0.0,0.0,0.1,5.1
+C09,10.4,-22.1,CD14 Mono,Treated,0.1,0.0,0.2,5.4
+C10,27.6,-4.2,B Cell,Treated,0.2,0.0,0.1,0.2

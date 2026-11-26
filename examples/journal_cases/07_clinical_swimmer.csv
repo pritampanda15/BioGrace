@@ -1,0 +1,9 @@
+patient,months,arm,pr_month,cr_month,ongoing
+PT-01,22.5,Combination,2.2,5.5,1
+PT-02,20.0,Combination,3.1,7.0,1
+PT-03,18.2,Monotherapy,3.8,,1
+PT-04,16.4,Combination,2.6,6.2,0
+PT-05,14.5,Monotherapy,4.1,,1
+PT-06,12.8,Combination,3.0,,0
+PT-07,10.6,Monotherapy,4.5,,0
+PT-08,8.4,Monotherapy,,,0

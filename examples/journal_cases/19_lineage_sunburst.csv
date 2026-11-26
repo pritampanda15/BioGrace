@@ -1,0 +1,8 @@
+lineage,subtype,percent
+T_Lymphocytes,CD4_Naive,19
+T_Lymphocytes,CD4_Memory,11
+T_Lymphocytes,CD8_Effector,16
+Myeloid,CD14_Monocyte,17
+Myeloid,cDC_Macrophage,11
+B_Lineage,Memory_B,16
+NK_ILC,CD56dim_NK,10

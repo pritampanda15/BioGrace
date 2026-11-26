@@ -49,7 +49,7 @@ Stop fighting `ggplot2` and `matplotlib` layouts for hours after finishing `DESe
   - **Biophysical Journal** (`85 / 128 / 178 mm`, 4-spine boxed frame, inward ticks)
   - **PNAS** (`87 / 114 / 178 mm`, open frame, outward ticks)
 - **7 Colorblind-Safe & Publication Palettes:** `Okabe–Ito`, `Nature (NPG)`, `ACS Classic`, `Paul Tol Bright`, `Paul Tol Muted`, `Viridis Discrete`, and `Grayscale Pub`.
-- **12 Continuous Colormaps (for scRNA Dot Plots & continuous scales):** `RdYlBu_r`, `viridis`, `plasma`, `inferno`, `magma`, `cividis`, `coolwarm`, `Spectral_r`, `turbo`, `Blues`, `YlGnBu`, and `cubehelix_r`.
+- **13 Continuous Colormaps (for scRNA Dot Plots & continuous scales):** `RdYlBu_r`, `viridis`, `plasma`, `inferno`, `magma`, `cividis`, `coolwarm`, `Spectral_r`, `turbo`, `Blues`, `YlGnBu`, `cubehelix_r`, and `Greys`.
 - **Typography & Export Controls:** `Sans-Serif (Helvetica/Arial)`, `Serif (Times New Roman/Georgia)`, `Monospace`, custom font size (`pt`), stroke line width (`pt`), Single / 1.5 / Double column widths (`mm`), Transparent Background, and `300 / 600 / 1200 DPI` PNG plus vector **SVG** & **PDF** (`svg2pdf.js`).
 
 ### 2. 20 Open-Source Top-Journal Figure Archetypes
@@ -58,7 +58,7 @@ Interactive vector SVG gallery inspired by the MIT-licensed [`GeneticistHere/ggp
 - **Genomics & Clinical:** Multi-Group Volcano (`03`), Manhattan GWAS/TWAS (`04`), Clinical Cohort Swimmer Plot (`07`), Importance Bars + Abundance Streams (`08`).
 - **Networks & Flows:** Circos Fusion-Gene Diagram (`10`), Module Interaction Network (`11`), Sankey + Enrichment Bubble Panel (`12`), Multi-Level Alluvial Flow (`17`).
 - **Heatmaps & Composition:** Discrete Binned Heatmap (`13`), Mantel Composite Correlation Heatmap (`14`), Multi-Group Correlation Heatmap (`15`), Polar-Coordinate Circular Heatmap (`16`), Hierarchical Pathway Treemap (`18`), Mosaic & Sunburst Ring (`19`).
-- Every figure responds live to all 7 journal presets, 7 color palettes, 12 colormaps, fonts, and stroke widths, with vector SVG/PDF export and reproducible `ggplot2` R & Python starter code.
+- Every figure responds live to all 6 journal presets, 7 color palettes, 13 colormaps, fonts, and stroke widths, with vector SVG/PDF export, reproducible `ggplot2` R & Python starter code, and an inline CSV Format Guide + downloadable sample CSV.
 
 ### 3. Biologist's Statistical Test Advisor, Anti-Barplot Studio & Plain-English Coach
 Stop choosing inappropriate statistical tests, hiding distributions behind dynamite bar charts + SEM, or decoding opaque statistical jargon:
@@ -79,6 +79,14 @@ Built using Apple's *Designing Fluid Interfaces* (WWDC) principles for the web:
 - Critically damped springs (`damping 1.0`) for UI chrome and plot threshold updates; momentum-driven springs for gesture flicks.
 - Interruptible right-edge Code & CLI sheet with 1:1 pointer drag, soft-boundary rubber-banding, and exponential-decay momentum projection.
 - Translucent frosted materials (`backdrop-filter`), optical SF Pro typography with `tabular-nums`, and full `prefers-reduced-motion`, `prefers-reduced-transparency`, and `prefers-contrast` accessibility support.
+
+---
+
+## Sample CSV Datasets (All 36 Plot Formats)
+
+Ready-to-upload test CSV files and column format specifications are included both **in-app** (via the **CSV Guide** button in the top bar and directly beneath every plot) and in the repository:
+- [`examples/`](./examples/) — Ready-to-upload CSVs for all **15 Interactive Plotter formats** + **Stat Advisor** (`sample_*.csv` and larger `test_*.csv` files). Uploading any CSV automatically detects its schema and switches to the matching plot.
+- [`examples/journal_cases/`](./examples/journal_cases/) — Complete CSV templates (`01_error_dotplot.csv` through `20_split_violin_markers.csv`) for all **20 Open-Source Top-Journal Figure Archetypes**.
 
 ---
 

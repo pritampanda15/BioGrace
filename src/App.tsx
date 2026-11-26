@@ -2115,56 +2115,65 @@ export function App() {
               </>
             )}
 
-            {/* 20 Journal Figures Guide & Attribution Strip */}
+            {/* 20 Journal Figures Guide, CSV Example & Attribution Strip */}
             {studio === 'gallery' && (
-              <div className="material-card rounded-2xl p-5 space-y-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--accent)]">
-                      {activeCase.category} · Based on {activeCase.journalSource}
+              <>
+                <div className="material-card rounded-2xl p-5 space-y-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+                        {activeCase.category} · Based on {activeCase.journalSource}
+                      </div>
+                      <h3 className="type-title text-base font-bold text-[var(--text-primary)] mt-0.5">
+                        When to Use This Figure &amp; How to Read It
+                      </h3>
                     </div>
-                    <h3 className="type-title text-base font-bold text-[var(--text-primary)] mt-0.5">
-                      When to Use This Figure &amp; How to Read It
-                    </h3>
-                  </div>
-                  <button
-                    type="button"
-                    onPointerDown={() => {
-                      setCodeSheetOpen(true);
-                      playAppleTick(soundEnabled, 'select');
-                    }}
-                    className="apple-press px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-[var(--accent)] text-white"
-                  >
-                    Get ggplot2 R / Python Code →
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                  <div className="rounded-xl p-3 bg-[var(--bg-subtle)] border border-[var(--border-hairline)]">
-                    <div className="font-semibold text-[var(--text-primary)] mb-1">Best Biological Use Case</div>
-                    <p className="text-[var(--text-secondary)] leading-relaxed">{activeCase.bestFor}</p>
-                  </div>
-                  <div className="rounded-xl p-3 bg-[var(--bg-subtle)] border border-[var(--border-hairline)]">
-                    <div className="font-semibold text-[var(--text-primary)] mb-1">Plain-English Reading Guide</div>
-                    <p className="text-[var(--text-secondary)] leading-relaxed">{activeCase.plainEnglishTip}</p>
-                  </div>
-                </div>
-                <div className="text-[11px] text-[var(--text-tertiary)] flex flex-wrap items-center justify-between gap-2 pt-1">
-                  <span>
-                    R packages: <code className="font-mono">{activeCase.rPackages.join(', ')}</code>
-                  </span>
-                  <span>
-                    Inspired by MIT open-source{' '}
-                    <a
-                      href="https://github.com/GeneticistHere/ggplot2-20-journal-cases"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="underline hover:text-[var(--accent)]"
+                    <button
+                      type="button"
+                      onPointerDown={() => {
+                        setCodeSheetOpen(true);
+                        playAppleTick(soundEnabled, 'select');
+                      }}
+                      className="apple-press px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-[var(--accent)] text-white"
                     >
-                      GeneticistHere/ggplot2-20-journal-cases
-                    </a>
-                  </span>
+                      Get ggplot2 R / Python Code →
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    <div className="rounded-xl p-3 bg-[var(--bg-subtle)] border border-[var(--border-hairline)]">
+                      <div className="font-semibold text-[var(--text-primary)] mb-1">Best Biological Use Case</div>
+                      <p className="text-[var(--text-secondary)] leading-relaxed">{activeCase.bestFor}</p>
+                    </div>
+                    <div className="rounded-xl p-3 bg-[var(--bg-subtle)] border border-[var(--border-hairline)]">
+                      <div className="font-semibold text-[var(--text-primary)] mb-1">Plain-English Reading Guide</div>
+                      <p className="text-[var(--text-secondary)] leading-relaxed">{activeCase.plainEnglishTip}</p>
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-[var(--text-tertiary)] flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <span>
+                      R packages: <code className="font-mono">{activeCase.rPackages.join(', ')}</code>
+                    </span>
+                    <span>
+                      Inspired by MIT open-source{' '}
+                      <a
+                        href="https://github.com/GeneticistHere/ggplot2-20-journal-cases"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline hover:text-[var(--accent)]"
+                      >
+                        GeneticistHere/ggplot2-20-journal-cases
+                      </a>
+                    </span>
+                  </div>
                 </div>
-              </div>
+                <div className="material-card rounded-2xl p-5">
+                  <CsvFormatGuide
+                    activeKey={activeCase.id}
+                    soundEnabled={soundEnabled}
+                    onTestLoadCsv={(csv, name, key) => ingestCsvText(csv, name, key)}
+                  />
+                </div>
+              </>
             )}
 
             {/* Studio 1 Plain-English Statistical Explainer, CSV Format Guide & Reproducibility Strip */}
@@ -2343,11 +2352,11 @@ export function App() {
           open={csvGuideOpen}
           onClose={() => setCsvGuideOpen(false)}
           title="CSV Format Guide & Sample Data"
-          subtitle="Downloadable templates & 1-click test data for all 16 plot formats"
+          subtitle="Downloadable templates & test data for all 36 plot formats (including all 20 journal figures)"
           soundEnabled={soundEnabled}
         >
           <CsvFormatGuide
-            activeKey={studio === 'stats' ? 'stats-tidy' : deConfig.plotType}
+            activeKey={studio === 'stats' ? 'stats-tidy' : studio === 'gallery' ? activeCase.id : deConfig.plotType}
             soundEnabled={soundEnabled}
             showSelector
             onTestLoadCsv={(csv, name, key) => {

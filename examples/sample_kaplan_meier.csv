@@ -1,0 +1,17 @@
+time,event,group
+4.2,1,Standard
+6.8,1,Standard
+9.1,1,Standard
+11.5,0,Standard
+13.4,1,Standard
+16.0,1,Standard
+19.2,1,Standard
+24.5,0,Standard
+10.5,1,Combo_IO
+15.2,0,Combo_IO
+21.8,1,Combo_IO
+26.4,0,Combo_IO
+31.0,1,Combo_IO
+36.5,0,Combo_IO
+42.0,0,Combo_IO
+48.0,0,Combo_IO
