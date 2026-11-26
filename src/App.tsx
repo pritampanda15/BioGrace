@@ -2363,6 +2363,11 @@ export function App() {
               ingestCsvText(csv, name, key);
               setCsvGuideOpen(false);
             }}
+            onOpenJournalCase={(caseId) => {
+              setStudio('gallery');
+              setActiveCaseId(caseId);
+              setCsvGuideOpen(false);
+            }}
           />
         </FluidSheet>
 
