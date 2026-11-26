@@ -1,11 +1,25 @@
-# BioGrace
+<p align="center">
+  <img src="./public/favicon.svg" alt="BioGrace Logo" width="76" height="76" />
+</p>
 
-**Publication-Grade DE & Single-Cell Plotter · Biologist's Statistical Test Advisor & Anti-Barplot Studio**
+<h1 align="center">BioGrace</h1>
 
-[![Live Studio](https://img.shields.io/badge/Live_Studio-GitHub_Pages-0071e3?style=flat-square)](https://pritampanda15.github.io/BioGrace/)
-[![CI & Stats Tests](https://github.com/pritampanda15/BioGrace/actions/workflows/ci.yml/badge.svg)](https://github.com/pritampanda15/BioGrace/actions/workflows/ci.yml)
-[![License: Academic Only](https://img.shields.io/badge/License-Academic_%26_Non--Commercial_Only-d55e00?style=flat-square)](./LICENSE)
-[![CLI Included](https://img.shields.io/badge/CLI-biograce-009e73?style=flat-square)](#biograce-cli-commands)
+<p align="center">
+  <strong>Publication-Grade DE &amp; Single-Cell Plotter · Biologist's Statistical Test Advisor &amp; Anti-Barplot Studio</strong>
+</p>
+
+<p align="center">
+  <a href="https://pritampanda15.github.io/BioGrace/"><img src="https://img.shields.io/badge/Live_Studio-GitHub_Pages-0071e3?style=flat-square" alt="Live Studio" /></a>
+  <a href="https://github.com/pritampanda15/BioGrace/actions/workflows/ci.yml"><img src="https://github.com/pritampanda15/BioGrace/actions/workflows/ci.yml/badge.svg" alt="CI & Stats Tests" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-Academic_%26_Non--Commercial_Only-d55e00?style=flat-square" alt="Academic Only License" /></a>
+  <a href="#biograce-cli-commands"><img src="https://img.shields.io/badge/CLI-biograce-009e73?style=flat-square" alt="CLI Included" /></a>
+</p>
+
+<p align="center">
+  <a href="https://pritampanda15.github.io/BioGrace/">
+    <img src="./public/og-preview.png" alt="BioGrace Studio Preview" width="840" />
+  </a>
+</p>
 
 BioGrace eliminates two daily bottlenecks between wet-lab and dry-lab biology inside a fluid, Apple-designed interface that runs **100% client-side in the browser** (zero server upload — your unpublished data never leaves your machine) and ships with a matching **headless CLI** and **auto-generated R & Python code**.
 
