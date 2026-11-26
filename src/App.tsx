@@ -61,6 +61,7 @@ import {
   getStatsDemoPresets,
 } from './lib/demoData';
 import {
+  detectBestPlotForCsv,
   parseDERows,
   parseDelimitedText,
   parseDoseResponseRows,
@@ -446,7 +447,8 @@ export function App() {
       return;
     }
 
-    const isStatsTarget = explicitTarget ? explicitTarget === 'stats-tidy' : studio === 'stats';
+    const detectedTarget = explicitTarget ?? detectBestPlotForCsv(table, deConfig.plotType, studio);
+    const isStatsTarget = detectedTarget === 'stats-tidy';
     if (isStatsTarget) {
       const parsed = parseTidyStatsTable(table);
       if (parsed.rows.length > 0) {
@@ -457,7 +459,7 @@ export function App() {
         setActiveStatsDemoId('custom');
         setStatsConfig((prev) => ({
           ...prev,
-          title: fileName.replace(/\.(csv|tsv|txt)$/i, ''),
+          title: fileName.replace(/\.(csv|tsv|txt)$/i, '').replace(/[_-]+/g, ' '),
           subtitle: '',
           xLabel: parsed.groupCol,
           yLabel: parsed.valueCol,
@@ -466,8 +468,8 @@ export function App() {
         }));
         notifyUpload(
           'success',
-          `CSV Uploaded: ${fileName}`,
-          `Loaded ${parsed.rows.length} rows (Group: ${parsed.groupCol}, Value: ${parsed.valueCol}).`
+          `CSV Uploaded: ${fileName} → Stat Advisor & Anti-Barplot`,
+          `Auto-detected tidy stats CSV · Loaded ${parsed.rows.length} rows (Group: ${parsed.groupCol}, Value: ${parsed.valueCol}).`
         );
         playAppleTick(soundEnabled, 'commit');
       } else {
@@ -480,17 +482,21 @@ export function App() {
       return;
     }
 
-    const targetPlot: DEPlotType =
-      explicitTarget && explicitTarget !== 'stats-tidy' ? explicitTarget : deConfig.plotType;
+    const targetPlot: DEPlotType = detectedTarget;
 
-    if (explicitTarget && explicitTarget !== 'stats-tidy') {
-      setStudio('plotter');
-      setDeConfig((p) => ({ ...p, plotType: targetPlot }));
-      if (['umap', 'tsne', 'dotplot', 'pseudotime'].includes(targetPlot)) setPlotGroupTab('sc');
-      else if (['dose-response', 'survival', 'forest', 'roc', 'correlation'].includes(targetPlot))
-        setPlotGroupTab('clinical');
-      else setPlotGroupTab('de');
-    }
+    setStudio('plotter');
+    setDeConfig((p) => ({
+      ...p,
+      plotType: targetPlot,
+      title: fileName.replace(/\.(csv|tsv|txt)$/i, '').replace(/[_-]+/g, ' '),
+      subtitle: '',
+      xLabel: '',
+      yLabel: '',
+    }));
+    if (['umap', 'tsne', 'dotplot', 'pseudotime'].includes(targetPlot)) setPlotGroupTab('sc');
+    else if (['dose-response', 'survival', 'forest', 'roc', 'correlation'].includes(targetPlot))
+      setPlotGroupTab('clinical');
+    else setPlotGroupTab('de');
 
     let loadedCount = 0;
     let detailMsg = '';

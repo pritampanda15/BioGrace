@@ -1,0 +1,25 @@
+time,event,group
+2.4,1,Chemotherapy
+4.1,1,Chemotherapy
+5.8,1,Chemotherapy
+7.2,1,Chemotherapy
+8.5,0,Chemotherapy
+9.6,1,Chemotherapy
+11.2,1,Chemotherapy
+13.4,1,Chemotherapy
+15.1,0,Chemotherapy
+17.8,1,Chemotherapy
+20.4,1,Chemotherapy
+23.0,0,Chemotherapy
+6.5,1,Anti-PD1 + Chemo
+10.2,0,Anti-PD1 + Chemo
+14.8,1,Anti-PD1 + Chemo
+18.4,0,Anti-PD1 + Chemo
+22.1,1,Anti-PD1 + Chemo
+26.5,0,Anti-PD1 + Chemo
+29.0,1,Anti-PD1 + Chemo
+33.4,0,Anti-PD1 + Chemo
+37.2,0,Anti-PD1 + Chemo
+41.5,0,Anti-PD1 + Chemo
+45.0,0,Anti-PD1 + Chemo
+48.0,0,Anti-PD1 + Chemo

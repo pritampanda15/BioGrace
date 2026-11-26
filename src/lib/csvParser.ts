@@ -1,11 +1,13 @@
 import Papa from 'papaparse';
 import type {
+  DEPlotType,
   DotPlotRow,
   PathwayRow,
   TidyStatRow,
   UpSetItem,
   VolcanoRow,
 } from '../types/biograce';
+import type { CsvTemplateKey } from './csvTemplates';
 import type { DosePoint, PairXYRow, ROCInputRow, SurvivalRow } from './bioAnalytics';
 import type {
   DEGHeatmapData,
@@ -421,4 +423,93 @@ export function parsePseudotimeRows(table: ParsedTable): {
     ],
     series,
   };
+}
+
+/**
+ * Automatically detect the most appropriate BioGrace plot type from CSV headers & sample values
+ * so dropping ANY biological CSV immediately opens the matching publication plot!
+ */
+export function detectBestPlotForCsv(
+  table: ParsedTable,
+  currentPlot: DEPlotType,
+  currentStudio: 'plotter' | 'gallery' | 'stats'
+): CsvTemplateKey {
+  const lower = table.headers.map((h) => h.toLowerCase().trim());
+  const has = (list: string[]) => list.some((k) => lower.some((h) => h === k || h.includes(k)));
+
+  // 1. Single-cell embeddings
+  if (has(['umap_1', 'umap1']) && has(['umap_2', 'umap2'])) return 'umap';
+  if (has(['tsne_1', 'tsne1']) && has(['tsne_2', 'tsne2'])) return 'tsne';
+
+  // 2. PCA coordinates
+  if (has(['pc1', 'pc_1']) && has(['pc2', 'pc_2'])) return 'pca';
+
+  // 3. Survival (Kaplan-Meier)
+  if (has(['time', 'months', 'days', 'os_time', 'pfs']) && has(['event', 'status', 'death', 'os_event'])) {
+    return 'survival';
+  }
+
+  // 4. Forest Plot (HR / OR + CI)
+  if (has(['ci_low', 'cilow', 'lcl']) && has(['ci_high', 'cihigh', 'ucl'])) return 'forest';
+
+  // 5. Dose-Response / IC50
+  if (has(['conc', 'concentration', 'dose']) && has(['response', 'viability', 'inhibition', 'activity'])) {
+    return 'dose-response';
+  }
+
+  // 6. ROC / AUROC
+  if (has(['label', 'truth', 'outcome']) && has(['score', 'prob', 'prediction'])) return 'roc';
+
+  // 7. Pseudotime
+  if (has(['pseudotime'])) return 'pseudotime';
+
+  // 8. Pathway Lollipop (GSEA / ORA)
+  if (has(['pathway', 'term', 'geneset']) && has(['nes', 'enrichment', 'fold_enrichment'])) return 'lollipop';
+
+  // 9. Single-Cell Dot Plot
+  if (has(['pct_expr', 'pctexpr', 'pct', 'percent']) && has(['avg_expr', 'avgexpr', 'mean', 'scaled'])) {
+    return 'dotplot';
+  }
+
+  // 10. Differential Expression (Volcano / MA)
+  if (
+    has(['log2foldchange', 'avg_log2fc', 'logfc', 'log2fc', 'logfoldchanges']) &&
+    has(['padj', 'p_val_adj', 'fdr', 'adj.p.val', 'pvals_adj', 'pvalue'])
+  ) {
+    return currentPlot === 'ma' ? 'ma' : 'volcano';
+  }
+
+  // 11. UpSet binary matrix (first col ID, >= 2 remaining cols are strictly 0/1/true/false)
+  if (table.headers.length >= 3 && table.rows.length > 0) {
+    const restCols = table.headers.slice(1);
+    const allBinary = restCols.every((col) =>
+      table.rows.slice(0, 15).every((r) => {
+        const v = (r[col] ?? '').trim().toLowerCase();
+        return v === '0' || v === '1' || v === 'true' || v === 'false' || v === '';
+      })
+    );
+    if (allBinary) return 'upset';
+  }
+
+  // 12. Wide expression matrix (gene + >=4 numeric sample columns) -> DEG Heatmap
+  if (table.headers.length >= 5 && table.rows.length > 0) {
+    const restCols = table.headers.slice(1);
+    const allNum = restCols.every((col) =>
+      table.rows.slice(0, 10).every((r) => Number.isFinite(Number(r[col])))
+    );
+    if (allNum) return 'heatmap';
+  }
+
+  // 13. Tidy wet-lab statistics table (group + value + optional subject/replicate)
+  if (has(['group', 'condition', 'treatment', 'genotype', 'arm']) && has(['value', 'expression', 'measurement', 'viability', 'signal', 'score'])) {
+    return 'stats-tidy';
+  }
+
+  // 14. Two numeric columns (paired assay methods) -> Correlation / Bland-Altman
+  if (table.rows.length > 0) {
+    const numCols = table.headers.filter((h) => Number.isFinite(Number(table.rows[0]?.[h])));
+    if (numCols.length === 2 && !has(['group', 'condition'])) return 'correlation';
+  }
+
+  return currentStudio === 'stats' ? 'stats-tidy' : currentPlot;
 }
