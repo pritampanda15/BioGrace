@@ -9,13 +9,17 @@ function triggerBlobDownload(blob: Blob, filename: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Serialize an SVG element to a standalone XML string */
+/** Serialize an SVG element to a standalone XML string with exact viewBox dimensions */
 export function serializeSvg(svg: SVGSVGElement): string {
   const clone = svg.cloneNode(true) as SVGSVGElement;
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
   clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
-  if (!clone.getAttribute('width')) clone.setAttribute('width', '840');
-  if (!clone.getAttribute('height')) clone.setAttribute('height', '560');
+  const vb = svg.viewBox?.baseVal;
+  const w = vb && vb.width > 0 ? vb.width : 840;
+  const h = vb && vb.height > 0 ? vb.height : 560;
+  if (!clone.getAttribute('width')) clone.setAttribute('width', String(w));
+  if (!clone.getAttribute('height')) clone.setAttribute('height', String(h));
+  clone.style.background = 'transparent';
   const serializer = new XMLSerializer();
   return `<?xml version="1.0" encoding="UTF-8"?>\n${serializer.serializeToString(clone)}`;
 }
