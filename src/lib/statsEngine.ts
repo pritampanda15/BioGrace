@@ -313,7 +313,7 @@ export function shapiroWilk(values: number[]): { W: number; p: number } {
     p = Math.max(0, Math.min(1, 1 - (6 / Math.PI) * Math.asin(Math.sqrt(sqr * 4))));
   } else if (n <= 11) {
     const gamma = 0.459 * n - 2.273;
-    const wLog = -Math.log(Math.max(1e-12, 1 - W));
+    const wLog = Math.log(Math.max(1e-12, 1 - W));
     const mu = -0.0006714 * n ** 3 + 0.025054 * n ** 2 - 0.39978 * n + 0.544;
     const sigma = Math.exp(-0.0020322 * n ** 3 + 0.062767 * n ** 2 - 0.77857 * n + 1.3822);
     const z = (-Math.log(Math.max(1e-12, gamma - wLog)) - mu) / sigma;

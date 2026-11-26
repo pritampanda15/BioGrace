@@ -3,6 +3,7 @@
 **Publication-Grade DE & Single-Cell Plotter · Biologist's Statistical Test Advisor & Anti-Barplot Studio**
 
 [![Live Studio](https://img.shields.io/badge/Live_Studio-GitHub_Pages-0071e3?style=flat-square)](https://pritampanda15.github.io/BioGrace/)
+[![CI & Stats Tests](https://github.com/pritampanda15/BioGrace/actions/workflows/ci.yml/badge.svg)](https://github.com/pritampanda15/BioGrace/actions/workflows/ci.yml)
 [![License: Academic Only](https://img.shields.io/badge/License-Academic_%26_Non--Commercial_Only-d55e00?style=flat-square)](./LICENSE)
 [![CLI Included](https://img.shields.io/badge/CLI-biograce-009e73?style=flat-square)](#biograce-cli-commands)
 

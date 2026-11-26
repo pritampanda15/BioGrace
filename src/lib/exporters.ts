@@ -1,6 +1,3 @@
-import { jsPDF } from 'jspdf';
-import 'svg2pdf.js';
-
 function triggerBlobDownload(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -31,9 +28,13 @@ export function exportSvgFile(svg: SVGSVGElement | null, baseName: string): void
   triggerBlobDownload(blob, `${baseName}.svg`);
 }
 
-/** Download true vector PDF via jsPDF + svg2pdf.js */
+/**
+ * Download true vector PDF via lazy-loaded jsPDF + svg2pdf.js.
+ * Dynamic import keeps initial page load fast (~400 kB smaller first paint).
+ */
 export async function exportVectorPdfFile(svg: SVGSVGElement | null, baseName: string): Promise<void> {
   if (!svg) return;
+  const [{ jsPDF }] = await Promise.all([import('jspdf'), import('svg2pdf.js')]);
   const vb = svg.viewBox.baseVal;
   const width = vb && vb.width > 0 ? vb.width : 840;
   const height = vb && vb.height > 0 ? vb.height : 560;
@@ -45,7 +46,7 @@ export async function exportVectorPdfFile(svg: SVGSVGElement | null, baseName: s
   });
 
   await (pdf as unknown as {
-    svg: (el: Element, opts: { x: number; y: number; width: number; height: number }) => Promise<jsPDF>;
+    svg: (el: Element, opts: { x: number; y: number; width: number; height: number }) => Promise<unknown>;
   }).svg(svg, { x: 0, y: 0, width, height });
 
   pdf.save(`${baseName}.pdf`);
@@ -83,7 +84,7 @@ export async function exportPngFile(svg: SVGSVGElement | null, baseName: string,
   URL.revokeObjectURL(url);
 }
 
-/** Download plain-text source code (.R, .py, .sh, .json) */
+/** Download plain-text source code or JSON recipes (.R, .py, .sh, .json, .csv) */
 export function exportTextFile(content: string, filename: string): void {
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
   triggerBlobDownload(blob, filename);

@@ -11,12 +11,16 @@ import {
   FileCode2,
   FileSpreadsheet,
   FlaskConical,
+  FolderOpen,
   Grid2x2,
   Image as ImageIcon,
   Layers,
+  Lock,
   Moon,
   Palette,
   Pencil,
+  RotateCcw,
+  Save,
   Search,
   Sparkles,
   Sun,
@@ -181,6 +185,7 @@ export function App() {
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const recipeInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
@@ -626,6 +631,71 @@ export function App() {
     ingestCsvText(text, file.name);
   };
 
+  const handleSaveRecipe = () => {
+    const recipe = {
+      biograceVersion: '1.0.0',
+      savedAt: new Date().toISOString(),
+      studio,
+      plotGroupTab,
+      activeCaseId,
+      galleryTitles,
+      deConfig,
+      statsConfig,
+      embeddingColorBy,
+      embeddingSplit,
+      corrViewMode,
+    };
+    exportTextFile(JSON.stringify(recipe, null, 2), `${generatedCode.baseName}.biograce.json`);
+    notifyUpload('success', 'Saved Figure Recipe (.biograce.json)', 'Reload this recipe anytime to restore your exact styling, thresholds, and edited labels.');
+    playAppleTick(soundEnabled, 'commit');
+  };
+
+  const handleLoadRecipe = async (file: File) => {
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (parsed.studio) setStudio(parsed.studio);
+      if (parsed.plotGroupTab) setPlotGroupTab(parsed.plotGroupTab);
+      if (parsed.activeCaseId) setActiveCaseId(parsed.activeCaseId);
+      if (parsed.galleryTitles) setGalleryTitles(parsed.galleryTitles);
+      if (parsed.deConfig) setDeConfig((p) => ({ ...p, ...parsed.deConfig }));
+      if (parsed.statsConfig) setStatsConfig((p) => ({ ...p, ...parsed.statsConfig }));
+      if (parsed.embeddingColorBy !== undefined) setEmbeddingColorBy(parsed.embeddingColorBy);
+      if (parsed.embeddingSplit !== undefined) setEmbeddingSplit(parsed.embeddingSplit);
+      if (parsed.corrViewMode) setCorrViewMode(parsed.corrViewMode);
+      notifyUpload('success', `Loaded Recipe: ${file.name}`, 'Restored plot layout, journal preset, palette, thresholds, and inline edits.');
+      playAppleTick(soundEnabled, 'commit');
+    } catch {
+      notifyUpload('warning', `Could not parse recipe ${file.name}`, 'Make sure you selected a valid .biograce.json recipe file.');
+    }
+  };
+
+  const handleResetDemo = () => {
+    if (studio === 'stats') {
+      selectStatsDemo(statsDemos[0].id);
+      notifyUpload('success', 'Restored Demo Dataset', 'Loaded the default Bimodal Responder Split wet-lab showcase.');
+    } else {
+      setVolcanoRows(generateDemoVolcanoData());
+      setDotPlotRows(generateDemoDotPlotData());
+      setUpsetItems(generateDemoUpSetData());
+      setPathwayRows(generateDemoPathwayData());
+      setEmbeddingCells(generateDemoEmbeddingData());
+      setEmbeddingMarkers([...EMBEDDING_MARKERS]);
+      setEmbeddingColorBy('cluster');
+      setPcaData(generateDemoPCAData());
+      setDegHeatmap(generateDemoDEGHeatmap());
+      setPseudotime(generateDemoPseudotime());
+      setDosePoints(generateDemoDoseResponse());
+      setSurvivalRows(generateDemoSurvivalData());
+      setForestRows(generateDemoForestData());
+      setRocRows(generateDemoROCData());
+      setCorrRows(generateDemoCorrelationData());
+      setDeSourceFile('ifng_macrophage_deseq2.csv');
+      setDeUploadStatus({ fileName: 'Demo dataset', rowCount: 500, isCustom: false });
+      notifyUpload('success', 'Restored Built-In Demo Datasets', 'All plots are now displaying the default biological example datasets.');
+    }
+    playAppleTick(soundEnabled, 'snap');
+  };
+
   const generatedCode = useMemo(() => {
     if (studio === 'gallery') {
       return {
@@ -711,8 +781,12 @@ export function App() {
                 <Upload className="w-10 h-10 mx-auto text-[var(--accent)] mb-3" />
                 <h3 className="type-title text-xl font-bold">Drop CSV or TSV to Plot</h3>
                 <p className="text-xs text-[var(--text-secondary)] mt-1.5">
-                  Auto-detects DESeq2, edgeR, limma, Scanpy, Seurat, GSEA, or tidy experimental CSV tables.
+                  Auto-detects DESeq2, edgeR, limma, Scanpy, Seurat, IC50, Kaplan–Meier, ROC, or tidy wet-lab CSVs.
                 </p>
+                <div className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                  <Lock className="w-3.5 h-3.5" />
+                  100% Client-Side · Your data never leaves your browser
+                </div>
               </motion.div>
             </motion.div>
           )}
@@ -1611,13 +1685,23 @@ export function App() {
                       CSV Uploaded: <code className="font-mono">{activeUpload.fileName}</code> ({activeUpload.rowCount} items active)
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onPointerDown={() => fileInputRef.current?.click()}
-                    className="apple-press text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-700 dark:text-emerald-300"
-                  >
-                    Replace CSV
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onPointerDown={() => fileInputRef.current?.click()}
+                      className="apple-press text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-700 dark:text-emerald-300"
+                    >
+                      Replace CSV
+                    </button>
+                    <button
+                      type="button"
+                      onPointerDown={handleResetDemo}
+                      className="apple-press inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      Reset Demo
+                    </button>
+                  </div>
                 </div>
               );
             })()}
@@ -1698,6 +1782,36 @@ export function App() {
                 >
                   <ImageIcon className="w-3.5 h-3.5 text-emerald-500" />
                   {activeStyle.dpi} DPI PNG
+                </button>
+
+                <input
+                  ref={recipeInputRef}
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void handleLoadRecipe(f);
+                    e.target.value = '';
+                  }}
+                />
+                <button
+                  type="button"
+                  title="Save figure recipe (.biograce.json) for Reviewer #2 revisions"
+                  onPointerDown={handleSaveRecipe}
+                  className="apple-press inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-medium bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-secondary)]"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span className="hidden xl:inline">Save Recipe</span>
+                </button>
+                <button
+                  type="button"
+                  title="Load a saved .biograce.json figure recipe"
+                  onPointerDown={() => recipeInputRef.current?.click()}
+                  className="apple-press inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-medium bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-secondary)]"
+                >
+                  <FolderOpen className="w-3.5 h-3.5" />
+                  <span className="hidden xl:inline">Load</span>
                 </button>
               </div>
             </div>
@@ -2084,6 +2198,52 @@ export function App() {
             )}
           </section>
         </main>
+
+        {/* Minimal Public Launch Footer with Privacy Lock & Feedback Links */}
+        <footer className="mt-6 border-t border-[var(--border-hairline)] bg-[var(--bg-elevated)]/60">
+          <div className="max-w-[1460px] mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3 text-[11px] text-[var(--text-tertiary)]">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-400">
+                <Lock className="w-3.5 h-3.5" />
+                100% Local · Zero Data Leaves Your Browser
+              </span>
+              <span className="hidden sm:inline">·</span>
+              <button
+                type="button"
+                onPointerDown={() => setLicenseSheetOpen(true)}
+                className="underline hover:text-[var(--text-primary)]"
+              >
+                Academic &amp; Non-Commercial License
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-4">
+              <a
+                href="https://github.com/pritampanda15/BioGrace"
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-[var(--text-primary)] font-medium"
+              >
+                GitHub Repo
+              </a>
+              <a
+                href="https://github.com/pritampanda15/BioGrace/issues/new"
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-[var(--text-primary)] font-medium"
+              >
+                Request a Plot / Report Bug
+              </a>
+              <a
+                href="https://github.com/GeneticistHere/ggplot2-20-journal-cases"
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-[var(--text-primary)]"
+              >
+                20-Cases Attribution (MIT)
+              </a>
+            </div>
+          </div>
+        </footer>
 
         {/* Fluid Right-Edge Reproducible Code & CLI Sheet */}
         <FluidSheet
