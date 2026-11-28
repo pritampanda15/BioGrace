@@ -1,5 +1,34 @@
-import type { DEPlotType, PublicationStyleSettings } from '../types/biograce';
+import type { DEPlotType, PublicationStyleSettings, StatsPlotType } from '../types/biograce';
 import type { JournalCaseId } from './journalCasesCatalog';
+import type { WorkbenchSubTab } from '../components/workbench/WetLabWorkbench';
+
+export type ComposerPanelSource =
+  | {
+      type: 'plotter';
+      plotType: DEPlotType;
+      title: string;
+      subtitle: string;
+      xLabel: string;
+      yLabel: string;
+    }
+  | {
+      type: 'gallery';
+      caseId: JournalCaseId;
+      title?: string;
+      subtitle?: string;
+    }
+  | {
+      type: 'stats';
+      plotType: StatsPlotType;
+      title: string;
+      subtitle: string;
+      xLabel: string;
+      yLabel: string;
+    }
+  | {
+      type: 'workbench';
+      subTab: WorkbenchSubTab;
+    };
 
 export interface ComposerPanelItem {
   id: string;
@@ -8,6 +37,8 @@ export interface ComposerPanelItem {
   dataUrl: string;
   aspectRatio: number; // width / height
   scaleBarText?: string; // e.g. "50 µm" for microscopy panels
+  source?: ComposerPanelSource;
+  lockStyle?: boolean;
 }
 
 export interface ManuscriptFigureRecord {

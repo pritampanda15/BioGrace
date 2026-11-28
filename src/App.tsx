@@ -141,6 +141,7 @@ import {
   svgElementToDataUrl,
   type BioGraceProjectFile,
   type ComposerPanelItem,
+  type ComposerPanelSource,
   type ManuscriptFigureRecord,
 } from './lib/workspaceStore';
 import {
@@ -744,21 +745,201 @@ export function App() {
         : studio === 'workbench'
         ? `Workbench (${workbenchSubTab.toUpperCase()})`
         : deConfig.title;
+    const source: ComposerPanelSource =
+      studio === 'gallery'
+        ? {
+            type: 'gallery',
+            caseId: activeCase.id,
+            title: galleryTitles[activeCase.id]?.title,
+            subtitle: galleryTitles[activeCase.id]?.subtitle,
+          }
+        : studio === 'stats'
+        ? {
+            type: 'stats',
+            plotType: statsConfig.plotType,
+            title: statsConfig.title,
+            subtitle: statsConfig.subtitle,
+            xLabel: statsConfig.xLabel,
+            yLabel: statsConfig.yLabel,
+          }
+        : studio === 'workbench'
+        ? { type: 'workbench', subTab: workbenchSubTab }
+        : {
+            type: 'plotter',
+            plotType: deConfig.plotType,
+            title: deConfig.title,
+            subtitle: deConfig.subtitle,
+            xLabel: deConfig.xLabel,
+            yLabel: deConfig.yLabel,
+          };
     const item: ComposerPanelItem = {
       id: `panel-${Date.now()}`,
       label,
       kind: 'biograce-svg',
       dataUrl,
       aspectRatio,
+      source,
+      lockStyle: false,
     };
     setComposerPanels((prev) => [...prev, item].slice(0, 6));
     notifyUpload(
       'success',
       `Pinned to Figure Board (${Math.min(6, composerPanels.length + 1)} panels)`,
-      `"${label}" added to the Multi-Panel Figure Composer. Switch to Composer tab to arrange & export.`
+      `"${label}" pinned with Live Style Sync — sidebar palettes, colormaps, fonts & strokes will update it automatically.`
     );
     playAppleTick(soundEnabled, 'commit');
   };
+
+  const renderLiveComposerPanel = useCallback(
+    (source: ComposerPanelSource, panelSvgRef: React.RefObject<SVGSVGElement | null>): React.ReactNode => {
+      const noopEdit = () => {};
+      if (source.type === 'gallery') {
+        const meta = JOURNAL_CASES_20.find((c) => c.id === source.caseId) ?? JOURNAL_CASES_20[0];
+        return (
+          <JournalCaseRenderer
+            item={meta}
+            customTable={galleryTables[source.caseId]?.table ?? null}
+            customTitle={source.title}
+            customSubtitle={source.subtitle}
+            styleSettings={deConfig}
+            darkMode={darkMode}
+            svgRef={panelSvgRef}
+            onEditField={noopEdit}
+          />
+        );
+      }
+      if (source.type === 'stats') {
+        const syncedStats: StatsConfig = {
+          ...statsConfig,
+          preset: deConfig.preset,
+          palette: deConfig.palette,
+          colormap: deConfig.colormap,
+          fontFamily: deConfig.fontFamily,
+          fontSizePt: deConfig.fontSizePt,
+          lineWidth: deConfig.lineWidth,
+          columnWidth: deConfig.columnWidth,
+          dpi: deConfig.dpi,
+          transparentBg: deConfig.transparentBg,
+          paperExport: deConfig.paperExport,
+          plotType: source.plotType,
+          title: source.title,
+          subtitle: source.subtitle,
+          xLabel: source.xLabel,
+          yLabel: source.yLabel,
+        };
+        return (
+          <AntiBarplotCanvas
+            rows={statsRows}
+            analysis={statsAnalysis}
+            config={syncedStats}
+            darkMode={darkMode}
+            svgRef={panelSvgRef}
+            onEditField={noopEdit}
+          />
+        );
+      }
+      if (source.type === 'workbench') {
+        return (
+          <WetLabWorkbench
+            activeSubTab={source.subTab}
+            onChangeSubTab={() => {}}
+            styleSettings={deConfig}
+            darkMode={darkMode}
+            soundEnabled={false}
+            svgRef={panelSvgRef}
+            onSendQpcrToStats={() => {}}
+          />
+        );
+      }
+      const syncedDe: DEPlotConfig = {
+        ...deConfig,
+        plotType: source.plotType,
+        title: source.title,
+        subtitle: source.subtitle,
+        xLabel: source.xLabel,
+        yLabel: source.yLabel,
+      };
+      switch (source.plotType) {
+        case 'volcano':
+        case 'ma':
+          return (
+            <VolcanoMAPlot
+              mode={source.plotType}
+              rows={volcanoRows}
+              config={syncedDe}
+              darkMode={darkMode}
+              soundEnabled={false}
+              svgRef={panelSvgRef}
+              onToggleLabel={() => {}}
+              onMoveLabel={() => {}}
+              onEditField={noopEdit}
+            />
+          );
+        case 'dotplot':
+          return <DotPlotChart rows={dotPlotRows} config={syncedDe} darkMode={darkMode} svgRef={panelSvgRef} onEditField={noopEdit} />;
+        case 'upset':
+          return <UpSetPlot items={upsetItems} config={syncedDe} darkMode={darkMode} soundEnabled={false} svgRef={panelSvgRef} onEditField={noopEdit} />;
+        case 'lollipop':
+          return <PathwayLollipopPlot rows={pathwayRows} config={syncedDe} darkMode={darkMode} svgRef={panelSvgRef} onEditField={noopEdit} />;
+        case 'umap':
+        case 'tsne':
+          return (
+            <EmbeddingPlot
+              mode={source.plotType}
+              cells={embeddingCells}
+              markers={embeddingMarkers}
+              colorBy={embeddingColorBy}
+              splitByCondition={embeddingSplit}
+              config={syncedDe}
+              darkMode={darkMode}
+              soundEnabled={false}
+              svgRef={panelSvgRef}
+              onEditField={noopEdit}
+            />
+          );
+        case 'pca':
+          return <PCAPlot rows={pcaData.rows} pc1Var={pcaData.pc1Var} pc2Var={pcaData.pc2Var} config={syncedDe} darkMode={darkMode} svgRef={panelSvgRef} onEditField={noopEdit} />;
+        case 'heatmap':
+          return <DEGHeatmapPlot data={degHeatmap} config={syncedDe} darkMode={darkMode} svgRef={panelSvgRef} onEditField={noopEdit} />;
+        case 'pseudotime':
+          return <PseudotimePlot stages={pseudotime.stages} series={pseudotime.series} config={syncedDe} darkMode={darkMode} svgRef={panelSvgRef} onEditField={noopEdit} />;
+        case 'dose-response':
+          return <DoseResponsePlot points={dosePoints} config={syncedDe} darkMode={darkMode} svgRef={panelSvgRef} onEditField={noopEdit} />;
+        case 'survival':
+          return <SurvivalKMPlot rows={survivalRows} config={syncedDe} darkMode={darkMode} svgRef={panelSvgRef} onEditField={noopEdit} />;
+        case 'forest':
+          return <ForestPlotChart rows={forestRows} config={syncedDe} darkMode={darkMode} svgRef={panelSvgRef} onEditField={noopEdit} />;
+        case 'roc':
+          return <ROCPlotChart rows={rocRows} config={syncedDe} darkMode={darkMode} svgRef={panelSvgRef} onEditField={noopEdit} />;
+        case 'correlation':
+          return <CorrelationBlandAltmanPlot rows={corrRows} viewMode={corrViewMode} config={syncedDe} darkMode={darkMode} svgRef={panelSvgRef} onEditField={noopEdit} />;
+      }
+    },
+    [
+      galleryTables,
+      deConfig,
+      darkMode,
+      statsConfig,
+      statsRows,
+      statsAnalysis,
+      volcanoRows,
+      dotPlotRows,
+      upsetItems,
+      pathwayRows,
+      embeddingCells,
+      embeddingColorBy,
+      embeddingSplit,
+      pcaData,
+      degHeatmap,
+      pseudotime,
+      dosePoints,
+      survivalRows,
+      forestRows,
+      rocRows,
+      corrRows,
+      corrViewMode,
+    ]
+  );
 
   const handleSaveSnapshotToWorkspace = (tag: string) => {
     if (!svgRef.current) return;
@@ -1836,7 +2017,7 @@ export function App() {
               {/* 12 Continuous Colormaps (for scRNA Dot Plot & Continuous Scales) */}
               <div className="pt-1">
                 <label className="text-[10.5px] font-semibold text-[var(--text-secondary)] block mb-1">
-                  Continuous Colormap (12 · Dot Plot)
+                  Continuous Colormap ({COLORMAP_LIST.length} · Heatmaps &amp; Dot Plots)
                 </label>
                 <select
                   value={activeStyle.colormap}
@@ -2268,6 +2449,7 @@ export function App() {
                   darkMode={darkMode}
                   soundEnabled={soundEnabled}
                   svgRef={svgRef}
+                  renderLivePanel={renderLiveComposerPanel}
                 />
               ) : studio === 'gallery' ? (
                 <JournalCaseRenderer

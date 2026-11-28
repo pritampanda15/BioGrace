@@ -1,14 +1,21 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
   ImagePlus,
   LayoutGrid,
+  Lock,
   Ruler,
+  Sparkles,
   Trash2,
+  Unlock,
 } from 'lucide-react';
 import type { PublicationStyleSettings } from '../../types/biograce';
-import type { ComposerPanelItem } from '../../lib/workspaceStore';
+import {
+  svgElementToDataUrl,
+  type ComposerPanelItem,
+  type ComposerPanelSource,
+} from '../../lib/workspaceStore';
 import { JOURNAL_PRESETS, resolvePlotTheme } from '../../lib/palettes';
 import { playAppleTick } from '../../motion/applePhysics';
 
@@ -19,6 +26,10 @@ interface FigureComposerStudioProps {
   darkMode: boolean;
   soundEnabled: boolean;
   svgRef: React.RefObject<SVGSVGElement | null>;
+  renderLivePanel?: (
+    source: ComposerPanelSource,
+    panelSvgRef: React.RefObject<SVGSVGElement | null>
+  ) => React.ReactNode;
 }
 
 type GridPreset = '2x1' | '2x2' | '3x2' | '1x2';
@@ -32,6 +43,44 @@ function formatPanelLetter(index: number, style: PanelLabelStyle): string {
   return ch;
 }
 
+/**
+ * Offscreen live SVG renderer for a pinned BioGrace panel.
+ * Re-renders the real plot component whenever the user changes Journal Preset,
+ * Color Palette (e.g. Grayscale Pub, Okabe-Ito), Colormap, Font, Line Width,
+ * or Transparent Background in the left sidebar — keeping every panel 100% live!
+ */
+const LivePanelSyncer: React.FC<{
+  panelId: string;
+  source: ComposerPanelSource;
+  styleSignature: string;
+  renderLivePanel: (
+    source: ComposerPanelSource,
+    panelSvgRef: React.RefObject<SVGSVGElement | null>
+  ) => React.ReactNode;
+  onSynced: (panelId: string, dataUrl: string) => void;
+}> = ({ panelId, source, styleSignature, renderLivePanel, onSynced }) => {
+  const hiddenSvgRef = useRef<SVGSVGElement | null>(null);
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      if (!hiddenSvgRef.current) return;
+      try {
+        const { dataUrl } = svgElementToDataUrl(hiddenSvgRef.current);
+        onSynced(panelId, dataUrl);
+      } catch {
+        // Fallback to cached snapshot if serialization fails
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [panelId, source, styleSignature, onSynced]);
+
+  return (
+    <div style={{ width: 840, height: 560 }}>
+      {renderLivePanel(source, hiddenSvgRef)}
+    </div>
+  );
+};
+
 export const FigureComposerStudio: React.FC<FigureComposerStudioProps> = ({
   panels,
   onChangePanels,
@@ -39,17 +88,41 @@ export const FigureComposerStudio: React.FC<FigureComposerStudioProps> = ({
   darkMode,
   soundEnabled,
   svgRef,
+  renderLivePanel,
 }) => {
   const theme = resolvePlotTheme(styleSettings);
   const journal = JOURNAL_PRESETS[styleSettings.preset];
   const [grid, setGrid] = useState<GridPreset>('2x2');
   const [labelStyle, setLabelStyle] = useState<PanelLabelStyle>(journal.defaultPanelLabels);
   const [figureTitle, setFigureTitle] = useState('Figure 1 · Integrated Multi-Panel Manuscript Board');
+  const [liveUrls, setLiveUrls] = useState<Record<string, string>>({});
+
+  // Sync panel letter convention automatically when switching journal preset (Nature -> a,b,c; Science/Cell/ACS -> A,B,C)
+  useEffect(() => {
+    setLabelStyle(journal.defaultPanelLabels);
+  }, [journal.defaultPanelLabels]);
+
+  const styleSignature = JSON.stringify({
+    preset: styleSettings.preset,
+    palette: styleSettings.palette,
+    colormap: styleSettings.colormap,
+    fontFamily: styleSettings.fontFamily,
+    fontSizePt: styleSettings.fontSizePt,
+    lineWidth: styleSettings.lineWidth,
+    transparentBg: styleSettings.transparentBg,
+    paperExport: styleSettings.paperExport,
+    darkMode,
+  });
+
+  const handleSynced = React.useCallback((panelId: string, dataUrl: string) => {
+    setLiveUrls((prev) => (prev[panelId] === dataUrl ? prev : { ...prev, [panelId]: dataUrl }));
+  }, []);
 
   const paperBg = styleSettings.paperExport || !darkMode;
   const bgFill = theme.transparentBg ? 'none' : paperBg ? '#FFFFFF' : '#13141A';
   const inkPrimary = paperBg ? '#111827' : '#F5F5F7';
   const inkSecondary = paperBg ? '#515154' : '#A1A1AA';
+  const isGrayscalePub = styleSettings.palette === 'grayscale-pub';
 
   const cols = grid === '3x2' ? 3 : grid === '1x2' ? 1 : 2;
   const rows = grid === '2x1' ? 1 : 2;
@@ -101,12 +174,59 @@ export const FigureComposerStudio: React.FC<FigureComposerStudioProps> = ({
     playAppleTick(soundEnabled, 'select');
   };
 
+  const toggleLockStyle = (id: string) => {
+    onChangePanels(
+      panels.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              lockStyle: !p.lockStyle,
+              // Snapshot current live styling when locking so it freezes cleanly
+              dataUrl: !p.lockStyle && liveUrls[id] ? liveUrls[id] : p.dataUrl,
+            }
+          : p
+      )
+    );
+    playAppleTick(soundEnabled, 'select');
+  };
+
   const updateScaleBar = (id: string, text: string) => {
     onChangePanels(panels.map((p) => (p.id === id ? { ...p, scaleBarText: text } : p)));
   };
 
+  const liveSyncedCount = panels.filter((p) => p.source && !p.lockStyle).length;
+
   return (
     <div className="space-y-4">
+      {/* Hidden offscreen live re-renderers so sidebar Palettes, Colormaps, Fonts & Strokes update every pinned BioGrace panel in real time */}
+      {renderLivePanel && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            left: -20000,
+            top: 0,
+            width: 840,
+            opacity: 0,
+            pointerEvents: 'none',
+            overflow: 'hidden',
+          }}
+        >
+          {panels.map((p) =>
+            p.source && !p.lockStyle ? (
+              <LivePanelSyncer
+                key={p.id}
+                panelId={p.id}
+                source={p.source}
+                styleSignature={styleSignature}
+                renderLivePanel={renderLivePanel}
+                onSynced={handleSynced}
+              />
+            ) : null
+          )}
+        </div>
+      )}
+
       {/* Top Composer Controls */}
       <div className="material-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -172,17 +292,18 @@ export const FigureComposerStudio: React.FC<FigureComposerStudioProps> = ({
         </div>
       </div>
 
-      {/* Board Title Input */}
-      <div className="flex items-center gap-2">
+      {/* Live Style Sync Banner + Board Title Input */}
+      <div className="flex flex-wrap items-center gap-2">
         <input
           type="text"
           value={figureTitle}
           onChange={(e) => setFigureTitle(e.target.value)}
           placeholder="Optional multi-panel figure header (leave blank for clean submission)"
-          className="w-full px-3.5 py-2 rounded-xl text-xs font-medium bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--text-primary)]"
+          className="flex-1 min-w-[240px] px-3.5 py-2 rounded-xl text-xs font-medium bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--text-primary)]"
         />
-        <span className="shrink-0 text-[11px] font-semibold text-[var(--text-tertiary)] tabular-nums">
-          {journal.shortName} · {journal.widthsMm[styleSettings.columnWidth]} mm
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 tabular-nums">
+          <Sparkles className="w-3.5 h-3.5" />
+          Live Style Sync ({liveSyncedCount}/{panels.length}) · {theme.palette.name} · {styleSettings.fontSizePt}pt
         </span>
       </div>
 
@@ -195,6 +316,14 @@ export const FigureComposerStudio: React.FC<FigureComposerStudioProps> = ({
           style={{ fontFamily: theme.fontFamilyCss }}
           xmlns="http://www.w3.org/2000/svg"
         >
+          <defs>
+            <filter id="biograce-composer-grayscale" colorInterpolationFilters="sRGB">
+              <feColorMatrix
+                type="matrix"
+                values="0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0 0 0 1 0"
+              />
+            </filter>
+          </defs>
           <rect x={0} y={0} width={W} height={H} rx={16} fill={bgFill} />
 
           {figureTitle.trim() && (
@@ -210,18 +339,26 @@ export const FigureComposerStudio: React.FC<FigureComposerStudioProps> = ({
             const y = padTop + row * (cellH + gap);
             const panel = panels[idx];
             const letter = formatPanelLetter(idx, labelStyle);
+            const href =
+              panel && panel.source && !panel.lockStyle && liveUrls[panel.id]
+                ? liveUrls[panel.id]
+                : panel?.dataUrl;
+            // Apply monochrome print filter to legacy snapshots or external blots when Grayscale Pub is selected
+            const applyGrayFilter =
+              panel && !panel.lockStyle && isGrayscalePub && (!panel.source || panel.kind === 'external-image');
 
             return (
               <g key={idx}>
-                {panel ? (
+                {panel && href ? (
                   <>
                     <image
-                      href={panel.dataUrl}
+                      href={href}
                       x={x + 18}
                       y={y + 8}
                       width={cellW - 22}
                       height={cellH - 12}
                       preserveAspectRatio="xMidYMid meet"
+                      filter={applyGrayFilter ? 'url(#biograce-composer-grayscale)' : undefined}
                     />
                     {/* Optional Microscopy Scale Bar Overlay */}
                     {panel.kind === 'external-image' && panel.scaleBarText?.trim() && (
@@ -266,7 +403,7 @@ export const FigureComposerStudio: React.FC<FigureComposerStudioProps> = ({
                       fillOpacity={0.75}
                       fontSize={11}
                     >
-                      Click &ldquo;Pin to Figure Board&rdquo; on any BioGrace plot or add an image above
+                      Click &ldquo;Pin to Board&rdquo; on any BioGrace plot or add an image above
                     </text>
                   </g>
                 )}
@@ -290,8 +427,13 @@ export const FigureComposerStudio: React.FC<FigureComposerStudioProps> = ({
       {/* Panel Management Strip */}
       {panels.length > 0 && (
         <div className="material-card rounded-2xl p-4 space-y-2.5">
-          <div className="text-xs font-bold text-[var(--text-primary)]">
-            Pinned Panels ({panels.length}/{totalSlots}) — Reorder or Adjust Scale Bars
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs font-bold text-[var(--text-primary)]">
+              Pinned Panels ({panels.length}/{totalSlots}) — Reorder, Lock Style, or Adjust Scale Bars
+            </div>
+            <div className="text-[11px] text-[var(--text-tertiary)]">
+              Unlocked panels automatically update with every sidebar palette, colormap, font &amp; stroke change.
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {panels.map((p, i) => (
@@ -302,6 +444,13 @@ export const FigureComposerStudio: React.FC<FigureComposerStudioProps> = ({
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-[var(--text-primary)] truncate">
                     {formatPanelLetter(i, labelStyle)} · {p.label}
+                  </div>
+                  <div className="text-[10px] text-[var(--text-tertiary)]">
+                    {p.lockStyle
+                      ? 'Style locked (frozen)'
+                      : p.source
+                      ? 'Live-synced to sidebar theme'
+                      : 'Snapshot / External image'}
                   </div>
                   {p.kind === 'external-image' && (
                     <div className="flex items-center gap-1 mt-1">
@@ -317,6 +466,18 @@ export const FigureComposerStudio: React.FC<FigureComposerStudioProps> = ({
                   )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onPointerDown={() => toggleLockStyle(p.id)}
+                    className={`apple-press p-1 rounded-lg ${
+                      p.lockStyle
+                        ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                        : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)]'
+                    }`}
+                    title={p.lockStyle ? 'Unlock to sync with sidebar styles' : 'Lock this panel style'}
+                  >
+                    {p.lockStyle ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                  </button>
                   <button
                     type="button"
                     disabled={i === 0}
