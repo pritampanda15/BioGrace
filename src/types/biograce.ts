@@ -1,4 +1,4 @@
-export type StudioMode = 'plotter' | 'gallery' | 'stats';
+export type StudioMode = 'plotter' | 'gallery' | 'stats' | 'workbench' | 'composer';
 
 export type DEPlotType =
   | 'volcano'

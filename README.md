@@ -31,7 +31,7 @@ BioGrace eliminates two daily bottlenecks between wet-lab and dry-lab biology in
 
 ---
 
-## Two Integrated Studios
+## Five Integrated Studios (BioGrace v2.0 Complete Suite)
 
 ### 1. DE & Single-Cell Publication Plotter
 Stop fighting `ggplot2` and `matplotlib` layouts for hours after finishing `DESeq2`, `edgeR`, `limma`, `Scanpy`, or `Seurat`:
@@ -50,7 +50,8 @@ Stop fighting `ggplot2` and `matplotlib` layouts for hours after finishing `DESe
   - **PNAS** (`87 / 114 / 178 mm`, open frame, outward ticks)
 - **7 Colorblind-Safe & Publication Palettes:** `Okabe–Ito`, `Nature (NPG)`, `ACS Classic`, `Paul Tol Bright`, `Paul Tol Muted`, `Viridis Discrete`, and `Grayscale Pub`.
 - **13 Continuous Colormaps (for scRNA Dot Plots & continuous scales):** `RdYlBu_r`, `viridis`, `plasma`, `inferno`, `magma`, `cividis`, `coolwarm`, `Spectral_r`, `turbo`, `Blues`, `YlGnBu`, `cubehelix_r`, and `Greys`.
-- **Typography & Export Controls:** `Sans-Serif (Helvetica/Arial)`, `Serif (Times New Roman/Georgia)`, `Monospace`, custom font size (`pt`), stroke line width (`pt`), Single / 1.5 / Double column widths (`mm`), Transparent Background, and `300 / 600 / 1200 DPI` PNG plus vector **SVG** & **PDF** (`svg2pdf.js`).
+- **Typography, Preflight & Export Controls:** `Sans-Serif (Helvetica/Arial)`, `Serif (Times New Roman/Georgia)`, `Monospace`, custom font size (`pt`), stroke line width (`pt`), Single / 1.5 / Double column widths (`mm`), Transparent Background, **1-Click CVD Colorblindness Simulator** (Deuteranopia / Protanopia / Tritanopia / B&W Print), **Journal Submission Preflight Guard** with Auto-Fix, and `300 / 600 / 1200 DPI` PNG, **600 DPI 32-bit RGBA TIFF**, plus vector **SVG** & **PDF** (`svg2pdf.js`).
+- **Spreadsheet-Native Data Import:** Drag-and-drop CSV/TSV or multi-sheet **Excel (`.xlsx` / `.xls`)** workbooks, paste cells directly from Excel / Google Sheets / GraphPad Prism, and remap arbitrary column headers with the **Visual Column Mapper**.
 
 ### 2. 20 Open-Source Top-Journal Figure Archetypes
 Interactive vector SVG gallery inspired by the MIT-licensed [`GeneticistHere/ggplot2-20-journal-cases`](https://github.com/GeneticistHere/ggplot2-20-journal-cases) collection (*Nature*, *Nature Microbiology*, *Nature Cell Biology*, *Nature Communications*, *iMeta*, *IJMS*):
@@ -58,7 +59,7 @@ Interactive vector SVG gallery inspired by the MIT-licensed [`GeneticistHere/ggp
 - **Genomics & Clinical:** Multi-Group Volcano (`03`), Manhattan GWAS/TWAS (`04`), Clinical Cohort Swimmer Plot (`07`), Importance Bars + Abundance Streams (`08`).
 - **Networks & Flows:** Circos Fusion-Gene Diagram (`10`), Module Interaction Network (`11`), Sankey + Enrichment Bubble Panel (`12`), Multi-Level Alluvial Flow (`17`).
 - **Heatmaps & Composition:** Discrete Binned Heatmap (`13`), Mantel Composite Correlation Heatmap (`14`), Multi-Group Correlation Heatmap (`15`), Polar-Coordinate Circular Heatmap (`16`), Hierarchical Pathway Treemap (`18`), Mosaic & Sunburst Ring (`19`).
-- Every figure responds live to all 6 journal presets, 7 color palettes, 13 colormaps, fonts, and stroke widths, with vector SVG/PDF export, reproducible `ggplot2` R & Python starter code, and an inline CSV Format Guide + downloadable sample CSV.
+- Every figure is **live CSV data-driven** (upload your own CSV or click **Load Test CSV**), responds live to all 6 journal presets, 7 color palettes, 13 colormaps, fonts, and stroke widths, with vector SVG/PDF/TIFF export, reproducible `ggplot2` R & Python starter code, and an inline CSV Format Guide + downloadable sample CSV.
 
 ### 3. Biologist's Statistical Test Advisor, Anti-Barplot Studio & Plain-English Coach
 Stop choosing inappropriate statistical tests, hiding distributions behind dynamite bar charts + SEM, or decoding opaque statistical jargon:
@@ -70,6 +71,15 @@ Stop choosing inappropriate statistical tests, hiding distributions behind dynam
   - **Smart protocol advisor:** Recommends and explains Welch's t-test, Paired t-test, Mann–Whitney U, Wilcoxon signed-rank, Welch's one-way ANOVA, Kruskal–Wallis, or Friedman + **Benjamini–Hochberg (BH-FDR)** or **Holm** correction alongside effect sizes (Hedges' $g$, Cohen's $d_z$, Cliff's $\delta$, rank-biserial $r$, $\eta^2$, $\epsilon^2$).
 - **Anti-Barplot Studio:** Fluidly spring-morphs between the misleading **Barplot + SEM Trap** and honest **Raincloud** (half-violin KDE + Tukey boxplot + collision-free beeswarm), **Box + Beeswarm**, and **Paired Slopegraph** plots.
 - **Four built-in biological case studies:** *Bimodal Responder Split*, *Multi-Dose Skewed Viability*, *Paired Patient Pre/Post*, and *qPCR Technical Replicates (Pseudoreplication Guard)*.
+
+### 4. Power, Factorial & Wet-Lab Workbench
+- **Sample Size & Statistical Power Calculator:** A priori power curves for Two-Sample t-test, Paired t-test, One-Way ANOVA, and Survival Log-Rank (Schoenfeld) with a 1-click **NIH / ERC / IACUC Grant Power Justification Paragraph**.
+- **Two-Way Factorial ANOVA & Longitudinal Time-Course:** Interaction plots (*Genotype × Treatment* with interaction $p$-value) and growth curves (Mean ± 95% CI ribbons, AUC, per-day BH-FDR stars).
+- **Direct-to-Plot Wet-Lab Calculators:** **RT-qPCR $\Delta\Delta C_t$** (1-click send $2^{-\Delta\Delta C_t}$ fold changes into Anti-Barplot Studio), **ELISA 4PL Standard Curve** with unknown interpolation & `%CV` QC flags, and **Michaelis–Menten Enzyme Kinetics** ($V_{\max}, K_m$).
+
+### 5. Multi-Panel Figure Composer & Local Manuscript Workspace
+- **Multi-Panel Board (`a / b / c / d`):** Pin any live BioGrace plot or upload external microscopy / Western blot images into `2×1`, `2×2`, `3×2`, or `1×2` journal-width boards with bold journal-matched panel letters, optional microscopy scale bars (`50 µm`), and full-board vector **SVG / PDF / PNG / 600 DPI TIFF** export.
+- **Local Manuscript Workspace:** Save labeled snapshots (`Fig 1A`, `Fig 1B`, `Supp Fig 1`) locally in the browser across refreshes and export/import full `.biograce-project.json` bundles.
 
 ---
 

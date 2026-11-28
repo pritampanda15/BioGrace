@@ -18,7 +18,7 @@ export type AnyCsvGuideKey = CsvTemplateKey | JournalCaseId;
 interface CsvFormatGuideProps {
   activeKey: AnyCsvGuideKey;
   soundEnabled: boolean;
-  onTestLoadCsv?: (csvText: string, filename: string, targetKey: CsvTemplateKey) => void;
+  onTestLoadCsv?: (csvText: string, filename: string, targetKey: AnyCsvGuideKey) => void;
   onOpenJournalCase?: (caseId: JournalCaseId) => void;
   showSelector?: boolean;
 }
@@ -50,7 +50,7 @@ export const CsvFormatGuide: React.FC<CsvFormatGuideProps> = ({
     ? CSV_TEMPLATES[effectiveKey]
     : JOURNAL_CASE_CSV_TEMPLATES[effectiveKey] ?? CSV_TEMPLATES.volcano;
 
-  const canDirectLoad = isStudioCsvKey(effectiveKey) && Boolean(onTestLoadCsv);
+  const canDirectLoad = Boolean(onTestLoadCsv);
   const isJournalTemplate = !isStudioCsvKey(effectiveKey);
 
   const previewTable = useMemo(() => {
@@ -159,7 +159,7 @@ export const CsvFormatGuide: React.FC<CsvFormatGuideProps> = ({
             <button
               type="button"
               onPointerDown={() => {
-                onTestLoadCsv?.(spec.sampleCsv, spec.filename, effectiveKey as CsvTemplateKey);
+                onTestLoadCsv?.(spec.sampleCsv, spec.filename, effectiveKey);
                 playAppleTick(soundEnabled, 'commit');
               }}
               className="apple-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[var(--accent)] text-white"

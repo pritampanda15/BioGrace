@@ -1,5 +1,6 @@
 import React from 'react';
 import type { JournalCaseMeta } from '../../lib/journalCasesCatalog';
+import type { ParsedTable } from '../../lib/csvParser';
 import type { PublicationStyleSettings } from '../../types/biograce';
 import type { EditablePlotField } from '../ui/InlinePlotEditor';
 import { resolvePlotTheme } from '../../lib/palettes';
@@ -8,6 +9,7 @@ import { renderCasePartB } from './journalCasesPartB';
 
 interface JournalCaseRendererProps {
   item: JournalCaseMeta;
+  customTable?: ParsedTable | null;
   customTitle?: string;
   customSubtitle?: string;
   styleSettings: PublicationStyleSettings;
@@ -21,6 +23,7 @@ const HEIGHT = 560;
 
 export const JournalCaseRenderer: React.FC<JournalCaseRendererProps> = ({
   item,
+  customTable,
   customTitle,
   customSubtitle,
   styleSettings,
@@ -48,6 +51,7 @@ export const JournalCaseRenderer: React.FC<JournalCaseRendererProps> = ({
     bgStroke,
     baseFs,
     tickLen,
+    customTable: customTable ?? null,
   };
 
   const num = Number(item.number);

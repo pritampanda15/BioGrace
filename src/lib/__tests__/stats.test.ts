@@ -18,6 +18,23 @@ import {
   fitDoseResponse4PL,
 } from '../bioAnalytics';
 import { detectBestPlotForCsv, parseDelimitedText } from '../csvParser';
+import {
+  analyzeTimeCourse,
+  calculateSampleSizeAndPower,
+  computeQpcrDeltaDeltaCt,
+  DEMO_ELISA_STANDARDS,
+  DEMO_ELISA_UNKNOWNS,
+  DEMO_FACTORIAL_ROWS,
+  DEMO_KINETICS_POINTS,
+  DEMO_QPCR_ROWS,
+  DEMO_TIMECOURSE_ROWS,
+  fitElisaStandardCurve,
+  fitMichaelisMenten,
+  runTwoWayAnova,
+} from '../workbenchAnalytics';
+import { encodeRgbaToTiff } from '../exporters';
+import { detectJournalCaseForCsv } from '../journalCasesDataParser';
+import { runPreflightAudit } from '../preflight';
 
 describe('BioGrace Statistical Engine (Cross-checked against R / SciPy)', () => {
   it('Welch t-test matches R t.test(..., var.equal = FALSE)', () => {
@@ -190,4 +207,140 @@ describe('Smart CSV Auto-Plot Routing on examples/', () => {
       expect(detectBestPlotForCsv(table, 'volcano', 'plotter')).toBe(expected);
     });
   }
+});
+
+describe('BioGrace v2.0 Complete Suite Analytics, Preflight & TIFF', () => {
+  it('Sample Size & Power Calculator matches R pwr.t.test (d=0.8, 80% power -> n~26/group)', () => {
+    const res = calculateSampleSizeAndPower({
+      design: 'two-sample',
+      effectSize: 0.8,
+      alpha: 0.05,
+      targetPower: 0.8,
+    });
+    expect(res.requiredPerGroup).toBeGreaterThanOrEqual(25);
+    expect(res.requiredPerGroup).toBeLessThanOrEqual(27);
+    expect(res.requiredTotal).toBe(res.requiredPerGroup * 2);
+    expect(res.grantParagraph).toContain('80%');
+
+    const surv = calculateSampleSizeAndPower({
+      design: 'survival',
+      effectSize: 0.5,
+      alpha: 0.05,
+      targetPower: 0.8,
+      eventRate: 0.7,
+    });
+    expect(surv.requiredEvents).toBeGreaterThanOrEqual(60);
+    expect(surv.requiredEvents).toBeLessThanOrEqual(72);
+  });
+
+  it('Two-Way Factorial ANOVA detects strong Genotype x Treatment interaction', () => {
+    const res = runTwoWayAnova(DEMO_FACTORIAL_ROWS);
+    const inter = res.table.find((r) => r.source.includes('Interaction'))!;
+    expect(inter.f).toBeGreaterThan(100);
+    expect(inter.p).toBeLessThan(1e-6);
+  });
+
+  it('Longitudinal Time-Course computes AUC separation & per-day BH-FDR stars', () => {
+    const res = analyzeTimeCourse(DEMO_TIMECOURSE_ROWS);
+    expect(res.series).toHaveLength(2);
+    expect(res.series[0].auc).toBeGreaterThan(res.series[1].auc * 2);
+    const lastDay = res.perTimepointP[res.perTimepointP.length - 1];
+    expect(lastDay.pAdj).toBeLessThan(0.01);
+    expect(lastDay.stars).toMatch(/^\*+$/);
+  });
+
+  it('qPCR ΔΔCt normalizes control to ~1.0x and recovers high-dose induction', () => {
+    const res = computeQpcrDeltaDeltaCt(DEMO_QPCR_ROWS, 'Control');
+    const ctrlMean =
+      res.results.filter((r) => r.group === 'Control').reduce((a, r) => a + r.foldChange, 0) / 4;
+    const highMean =
+      res.results.filter((r) => r.group === 'High_Dose').reduce((a, r) => a + r.foldChange, 0) / 4;
+    expect(ctrlMean).toBeCloseTo(1.0, 1);
+    expect(highMean).toBeGreaterThan(8);
+    expect(res.tidyCsv).toContain('group,value,subject');
+  });
+
+  it('ELISA 4PL standard curve & Michaelis-Menten kinetics achieve R^2 > 0.99', () => {
+    const elisa = fitElisaStandardCurve(DEMO_ELISA_STANDARDS, DEMO_ELISA_UNKNOWNS);
+    expect(elisa.r2).toBeGreaterThan(0.99);
+    const oor = elisa.unknowns.find((u) => u.sample === 'High_Outlier');
+    expect(oor?.qcFlag).toBe('Out of Range');
+
+    const kin = fitMichaelisMenten(DEMO_KINETICS_POINTS);
+    expect(kin.r2).toBeGreaterThan(0.995);
+    expect(kin.vmax).toBeGreaterThan(95);
+    expect(kin.vmax).toBeLessThan(112);
+    expect(kin.km).toBeGreaterThan(10);
+    expect(kin.km).toBeLessThan(18);
+  });
+
+  it('Baseline 32-bit RGBA 600 DPI TIFF encoder produces valid TIFF 6.0 binary', () => {
+    const rgba = new Uint8ClampedArray([
+      255, 0, 0, 255, 0, 255, 0, 128,
+      0, 0, 255, 0, 255, 255, 255, 255,
+    ]);
+    const tiff = encodeRgbaToTiff(rgba, 2, 2, 600);
+    const view = new DataView(tiff.buffer);
+    // "II" little-endian magic + 42
+    expect(tiff[0]).toBe(0x49);
+    expect(tiff[1]).toBe(0x49);
+    expect(view.getUint16(2, true)).toBe(42);
+    expect(view.getUint16(8, true)).toBe(13); // 13 IFD entries
+    // Last 16 bytes match RGBA pixel payload verbatim
+    expect(Array.from(tiff.slice(tiff.length - 16))).toEqual(Array.from(rgba));
+  });
+
+  it('Journal Submission Preflight Guard flags tiny fonts and passes Nature-compliant settings', () => {
+    const good = runPreflightAudit(
+      {
+        preset: 'nature',
+        palette: 'okabe-ito',
+        colormap: 'RdYlBu_r',
+        fontFamily: 'sans-serif',
+        fontSizePt: 8,
+        lineWidth: 1.0,
+        columnWidth: 'double',
+        dpi: 600,
+        transparentBg: false,
+        paperExport: true,
+      },
+      false
+    );
+    expect(good.failCount).toBe(0);
+    expect(good.warnCount).toBe(0);
+
+    const bad = runPreflightAudit(
+      {
+        preset: 'cell',
+        palette: 'nature-npg',
+        colormap: 'RdYlBu_r',
+        fontFamily: 'sans-serif',
+        fontSizePt: 4.5,
+        lineWidth: 0.3,
+        columnWidth: 'single',
+        dpi: 300,
+        transparentBg: false,
+        paperExport: false,
+      },
+      true
+    );
+    expect(bad.failCount).toBeGreaterThanOrEqual(1);
+    expect(bad.warnCount).toBeGreaterThanOrEqual(2);
+  });
+
+  it('Auto-detects 20 Journal Figures CSV schemas in examples/journal_cases/', () => {
+    const jDir = path.resolve(process.cwd(), 'examples', 'journal_cases');
+    const samples: [string, string][] = [
+      ['04_manhattan_twas.csv', '04-manhattan-twas'],
+      ['07_clinical_swimmer.csv', '07-swimmer'],
+      ['10_circos_fusions.csv', '10-circos-fusion'],
+      ['14_mantel_composite.csv', '14-mantel-composite'],
+      ['18_pathway_treemap.csv', '18-treemap'],
+      ['20_split_violin_markers.csv', '20-split-violin'],
+    ];
+    for (const [fname, expected] of samples) {
+      const table = parseDelimitedText(fs.readFileSync(path.join(jDir, fname), 'utf8'));
+      expect(detectJournalCaseForCsv(table)).toBe(expected);
+    }
+  });
 });

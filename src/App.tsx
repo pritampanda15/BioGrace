@@ -4,21 +4,26 @@ import {
   Activity,
   BarChart3,
   BookOpen,
+  Calculator,
   Check,
+  ClipboardPaste,
   Code2,
   Copy,
   Download,
   FileCode2,
   FileSpreadsheet,
   FlaskConical,
+  FolderKanban,
   FolderOpen,
   Grid2x2,
   Image as ImageIcon,
   Layers,
+  LayoutGrid,
   Lock,
   Moon,
   Palette,
   Pencil,
+  Pin,
   RotateCcw,
   Save,
   Search,
@@ -112,12 +117,32 @@ import {
   exportPngFile,
   exportSvgFile,
   exportTextFile,
+  exportTiffFile,
   exportVectorPdfFile,
 } from './lib/exporters';
 import { APPLE_SPRINGS, playAppleTick } from './motion/applePhysics';
 import { AppleSegmentedControl } from './components/ui/AppleSegmentedControl';
 import { FluidSheet } from './components/ui/FluidSheet';
-import { CsvFormatGuide } from './components/ui/CsvFormatGuide';
+import { CsvFormatGuide, type AnyCsvGuideKey } from './components/ui/CsvFormatGuide';
+import { CvdPreflightBar } from './components/ui/CvdPreflightBar';
+import { DataImportMapperModal } from './components/ui/DataImportMapperModal';
+import { ManuscriptProjectDrawer } from './components/ui/ManuscriptProjectDrawer';
+import { WetLabWorkbench, type WorkbenchSubTab } from './components/workbench/WetLabWorkbench';
+import { FigureComposerStudio } from './components/composer/FigureComposerStudio';
+import type { CvdSimulationMode } from './lib/preflight';
+import { detectJournalCaseForCsv } from './lib/journalCasesDataParser';
+import { parseExcelWorkbook } from './lib/spreadsheetImport';
+import type { ParsedTable } from './lib/csvParser';
+import {
+  loadComposerPanels,
+  loadSavedFigures,
+  persistComposerPanels,
+  persistSavedFigures,
+  svgElementToDataUrl,
+  type BioGraceProjectFile,
+  type ComposerPanelItem,
+  type ManuscriptFigureRecord,
+} from './lib/workspaceStore';
 import {
   InlinePlotEditor,
   type ActivePlotEdit,
@@ -157,7 +182,18 @@ export function App() {
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [codeSheetOpen, setCodeSheetOpen] = useState(false);
   const [csvGuideOpen, setCsvGuideOpen] = useState(false);
+  const [mapperSheetOpen, setMapperSheetOpen] = useState(false);
+  const [projectSheetOpen, setProjectSheetOpen] = useState(false);
   const [licenseSheetOpen, setLicenseSheetOpen] = useState(false);
+  const [cvdMode, setCvdMode] = useState<CvdSimulationMode>('none');
+  const [workbenchSubTab, setWorkbenchSubTab] = useState<WorkbenchSubTab>('power');
+  const [galleryTables, setGalleryTables] = useState<
+    Partial<Record<JournalCaseId, { table: ParsedTable; fileName: string }>>
+  >({});
+  const [composerPanels, setComposerPanels] = useState<ComposerPanelItem[]>(() => loadComposerPanels());
+  const [savedFigures, setSavedFigures] = useState<ManuscriptFigureRecord[]>(() => loadSavedFigures());
+  const [mapperInitText, setMapperInitText] = useState('');
+  const [mapperInitName, setMapperInitName] = useState('pasted_spreadsheet.tsv');
   const [codeTab, setCodeTab] = useState<'r' | 'python' | 'cli'>('r');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
@@ -190,6 +226,14 @@ export function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
   }, [darkMode]);
+
+  useEffect(() => {
+    persistComposerPanels(composerPanels);
+  }, [composerPanels]);
+
+  useEffect(() => {
+    persistSavedFigures(savedFigures);
+  }, [savedFigures]);
 
   // ---------------- Studio 1 State (DE & Single-Cell) ----------------
   const [volcanoRows, setVolcanoRows] = useState<VolcanoRow[]>(() => generateDemoVolcanoData());
@@ -437,10 +481,13 @@ export function App() {
     []
   );
 
+  const isJournalCaseKey = (key: AnyCsvGuideKey): key is JournalCaseId =>
+    JOURNAL_CASES_20.some((c) => c.id === key);
+
   const ingestCsvText = (
     text: string,
     fileName: string,
-    explicitTarget?: CsvTemplateKey
+    explicitTarget?: AnyCsvGuideKey
   ) => {
     const table = parseDelimitedText(text);
     if (table.rows.length === 0) {
@@ -452,7 +499,35 @@ export function App() {
       return;
     }
 
-    const detectedTarget = explicitTarget ?? detectBestPlotForCsv(table, deConfig.plotType, studio);
+    // Check explicit or auto-detected 20 Journal Figure schema first
+    const explicitJournal =
+      explicitTarget && isJournalCaseKey(explicitTarget) ? explicitTarget : null;
+    const autoJournal = !explicitTarget ? detectJournalCaseForCsv(table) : null;
+    const journalTarget =
+      explicitJournal ?? (studio === 'gallery' && !explicitTarget ? autoJournal ?? activeCaseId : autoJournal);
+
+    if (journalTarget && (explicitJournal || autoJournal || studio === 'gallery')) {
+      setStudio('gallery');
+      setActiveCaseId(journalTarget);
+      setGalleryTables((prev) => ({ ...prev, [journalTarget]: { table, fileName } }));
+      const meta = JOURNAL_CASES_20.find((c) => c.id === journalTarget);
+      notifyUpload(
+        'success',
+        `CSV Uploaded: ${fileName} → ${meta?.title ?? journalTarget}`,
+        `Live-rendered ${table.rows.length} rows directly onto Journal Figure ${meta?.number ?? ''}.`
+      );
+      playAppleTick(soundEnabled, 'commit');
+      return;
+    }
+
+    const detectedTarget: CsvTemplateKey =
+      explicitTarget && !isJournalCaseKey(explicitTarget)
+        ? explicitTarget
+        : detectBestPlotForCsv(
+            table,
+            deConfig.plotType,
+            studio === 'stats' ? 'stats' : studio === 'gallery' ? 'gallery' : 'plotter'
+          );
     const isStatsTarget = detectedTarget === 'stats-tidy';
     if (isStatsTarget) {
       const parsed = parseTidyStatsTable(table);
@@ -627,8 +702,90 @@ export function App() {
   };
 
   const handleFileIngest = async (file: File) => {
+    if (/\.(xlsx|xls|ods)$/i.test(file.name)) {
+      try {
+        const wb = await parseExcelWorkbook(file);
+        const firstSheet = wb.sheetNames[0];
+        if (!firstSheet) return;
+        const csv = wb.sheetsCsv[firstSheet] ?? '';
+        if (wb.sheetNames.length > 1) {
+          setMapperInitText(csv);
+          setMapperInitName(`${file.name} [${firstSheet}]`);
+          setMapperSheetOpen(true);
+          notifyUpload(
+            'success',
+            `Excel Workbook Loaded: ${file.name}`,
+            `Found ${wb.sheetNames.length} sheets (${wb.sheetNames.slice(0, 3).join(', ')}). Map columns or click Plot Now.`
+          );
+        } else {
+          ingestCsvText(csv, `${file.name} [${firstSheet}]`);
+        }
+      } catch (err) {
+        notifyUpload(
+          'warning',
+          `Could not read Excel file ${file.name}`,
+          err instanceof Error ? err.message : 'Ensure the workbook is a valid .xlsx/.xls file.'
+        );
+      }
+      return;
+    }
     const text = await file.text();
     ingestCsvText(text, file.name);
+  };
+
+  const handlePinActiveToComposer = () => {
+    if (!svgRef.current || studio === 'composer') return;
+    const { dataUrl, aspectRatio } = svgElementToDataUrl(svgRef.current);
+    const label =
+      studio === 'gallery'
+        ? galleryTitles[activeCase.id]?.title ?? activeCase.title
+        : studio === 'stats'
+        ? statsConfig.title
+        : studio === 'workbench'
+        ? `Workbench (${workbenchSubTab.toUpperCase()})`
+        : deConfig.title;
+    const item: ComposerPanelItem = {
+      id: `panel-${Date.now()}`,
+      label,
+      kind: 'biograce-svg',
+      dataUrl,
+      aspectRatio,
+    };
+    setComposerPanels((prev) => [...prev, item].slice(0, 6));
+    notifyUpload(
+      'success',
+      `Pinned to Figure Board (${Math.min(6, composerPanels.length + 1)} panels)`,
+      `"${label}" added to the Multi-Panel Figure Composer. Switch to Composer tab to arrange & export.`
+    );
+    playAppleTick(soundEnabled, 'commit');
+  };
+
+  const handleSaveSnapshotToWorkspace = (tag: string) => {
+    if (!svgRef.current) return;
+    const { dataUrl } = svgElementToDataUrl(svgRef.current);
+    const title =
+      studio === 'gallery'
+        ? galleryTitles[activeCase.id]?.title ?? activeCase.title
+        : studio === 'stats'
+        ? statsConfig.title
+        : studio === 'workbench'
+        ? `Workbench · ${workbenchSubTab}`
+        : studio === 'composer'
+        ? 'Multi-Panel Composite Figure'
+        : deConfig.title;
+    const rec: ManuscriptFigureRecord = {
+      id: `fig-${Date.now()}`,
+      tag,
+      title,
+      studio,
+      plotType: studio === 'plotter' ? deConfig.plotType : undefined,
+      caseId: studio === 'gallery' ? activeCase.id : undefined,
+      styleSettings: activeStyle,
+      previewDataUrl: dataUrl,
+      savedAt: new Date().toISOString(),
+    };
+    setSavedFigures((prev) => [rec, ...prev]);
+    notifyUpload('success', `Saved ${tag} to Local Manuscript Workspace`, `Stored locally in your browser for multi-figure manuscript management.`);
   };
 
   const handleSaveRecipe = () => {
@@ -697,6 +854,22 @@ export function App() {
   };
 
   const generatedCode = useMemo(() => {
+    if (studio === 'composer') {
+      return {
+        r: `# Multi-panel composite figure assembled in BioGrace Figure Composer\n# Exported directly as publication vector SVG, PDF, PNG, or 600 DPI TIFF.\n# Recommended R layout package for programmatic assembly: patchwork::wrap_plots(pA, pB, pC, pD, ncol = 2) + plot_annotation(tag_levels = "a")`,
+        python: `# Multi-panel composite figure assembled in BioGrace Figure Composer\n# For programmatic Python assembly use: fig, axes = plt.subplots(2, 2, figsize=(7.2, 4.8), constrained_layout=True)`,
+        cli: `# BioGrace Multi-Panel Figure Composer\n# Use the Export buttons (SVG / PDF / PNG / 600 DPI TIFF) for journal-ready multi-panel output.`,
+        baseName: `biograce_multipanel_${activeStyle.preset}`,
+      };
+    }
+    if (studio === 'workbench') {
+      return {
+        r: `# BioGrace Power & Wet-Lab Workbench (${workbenchSubTab})\n# R equivalents: pwr::pwr.t.test(), aov(value ~ factorA * factorB), drc::drm(..., fct = LL.4())`,
+        python: `# BioGrace Power & Wet-Lab Workbench (${workbenchSubTab})\n# Python equivalents: statsmodels.stats.power, scipy.optimize.curve_fit`,
+        cli: `# BioGrace Power & Wet-Lab Workbench (${workbenchSubTab}) — exported directly from browser`,
+        baseName: `biograce_${workbenchSubTab}_${activeStyle.preset}`,
+      };
+    }
     if (studio === 'gallery') {
       return {
         r: generateJournalCaseRCode(
@@ -884,34 +1057,45 @@ export function App() {
             <div className="hidden lg:block">
               <AppleSegmentedControl<StudioMode>
                 layoutId="studio-nav-pill"
+                size="sm"
                 value={studio}
                 onChange={setStudio}
                 soundEnabled={soundEnabled}
                 options={[
                   {
                     value: 'plotter',
-                    label: 'DE & Single-Cell',
+                    label: 'DE & scRNA',
                     icon: <Activity className="w-3.5 h-3.5" />,
                   },
                   {
                     value: 'gallery',
-                    label: '20 Journal Figures',
+                    label: '20 Journals',
                     icon: <Grid2x2 className="w-3.5 h-3.5" />,
                   },
                   {
                     value: 'stats',
-                    label: 'Stat Advisor & Anti-Barplot',
+                    label: 'Stat Advisor',
                     icon: <FlaskConical className="w-3.5 h-3.5" />,
+                  },
+                  {
+                    value: 'workbench',
+                    label: 'Power & Lab',
+                    icon: <Calculator className="w-3.5 h-3.5" />,
+                  },
+                  {
+                    value: 'composer',
+                    label: composerPanels.length > 0 ? `Composer (${composerPanels.length})` : 'Composer',
+                    icon: <LayoutGrid className="w-3.5 h-3.5" />,
                   },
                 ]}
               />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv,.tsv,.txt"
+                accept=".csv,.tsv,.txt,.xlsx,.xls"
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
@@ -921,34 +1105,75 @@ export function App() {
               />
               <button
                 type="button"
+                title="Browse CSV schemas & sample data for all 36 plots"
                 onPointerDown={() => {
                   setCsvGuideOpen(true);
                   playAppleTick(soundEnabled, 'select');
                 }}
-                className="apple-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-primary)]"
+                className="apple-press inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-primary)]"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500" />
-                <span className="hidden md:inline">CSV Guide</span>
+                <span className="hidden xl:inline">CSV Guide</span>
+              </button>
+
+              <button
+                type="button"
+                title="Paste from Excel / Prism, import .xlsx, or map arbitrary column headers"
+                onPointerDown={() => {
+                  setMapperSheetOpen(true);
+                  playAppleTick(soundEnabled, 'select');
+                }}
+                className="apple-press inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-primary)]"
+              >
+                <ClipboardPaste className="w-3.5 h-3.5 text-[var(--accent)]" />
+                <span className="hidden xl:inline">Excel / Map</span>
+              </button>
+
+              <button
+                type="button"
+                title="Manage saved manuscript figures (Fig 1A, Fig 1B, etc.) locally"
+                onPointerDown={() => {
+                  setProjectSheetOpen(true);
+                  playAppleTick(soundEnabled, 'select');
+                }}
+                className="apple-press inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-primary)]"
+              >
+                <FolderKanban className="w-3.5 h-3.5 text-amber-500" />
+                <span className="hidden xl:inline">
+                  Workspace{savedFigures.length > 0 ? ` (${savedFigures.length})` : ''}
+                </span>
               </button>
 
               <button
                 type="button"
                 onPointerDown={() => fileInputRef.current?.click()}
-                className={`apple-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium ${
-                  (studio === 'stats' ? statsUploadStatus.isCustom : deUploadStatus.isCustom) && studio !== 'gallery'
+                className={`apple-press inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium ${
+                  (studio === 'stats'
+                    ? statsUploadStatus.isCustom
+                    : studio === 'gallery'
+                    ? Boolean(galleryTables[activeCase.id])
+                    : deUploadStatus.isCustom)
                     ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/35'
                     : 'bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-primary)]'
                 }`}
               >
-                {(studio === 'stats' ? statsUploadStatus.isCustom : deUploadStatus.isCustom) && studio !== 'gallery' ? (
+                {(studio === 'stats'
+                  ? statsUploadStatus.isCustom
+                  : studio === 'gallery'
+                  ? Boolean(galleryTables[activeCase.id])
+                  : deUploadStatus.isCustom) ? (
                   <Check className="w-3.5 h-3.5" />
                 ) : (
                   <Upload className="w-3.5 h-3.5" />
                 )}
-                <span className="hidden sm:inline max-w-[140px] truncate">
-                  {(studio === 'stats' ? statsUploadStatus.isCustom : deUploadStatus.isCustom) && studio !== 'gallery'
-                    ? (studio === 'stats' ? statsUploadStatus.fileName : deUploadStatus.fileName)
-                    : 'Upload CSV'}
+                <span className="hidden sm:inline max-w-[115px] truncate">
+                  {studio === 'stats' && statsUploadStatus.isCustom
+                    ? statsUploadStatus.fileName
+                    : studio === 'gallery' && galleryTables[activeCase.id]
+                    ? galleryTables[activeCase.id]!.fileName
+                    : deUploadStatus.isCustom
+                    ? deUploadStatus.fileName
+                    : 'Upload'}
                 </span>
               </button>
 
@@ -958,10 +1183,10 @@ export function App() {
                   setCodeSheetOpen(true);
                   playAppleTick(soundEnabled, 'select');
                 }}
-                className="apple-press inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-[var(--accent)] text-white shadow-sm"
+                className="apple-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[var(--accent)] text-white shadow-sm"
               >
                 <Code2 className="w-3.5 h-3.5" />
-                <span>R · Python · CLI</span>
+                <span className="hidden md:inline">Code</span>
               </button>
 
               <button
@@ -994,9 +1219,11 @@ export function App() {
               fullWidth
               size="sm"
               options={[
-                { value: 'plotter', label: 'DE & scRNA', icon: <Activity className="w-3.5 h-3.5" /> },
-                { value: 'gallery', label: '20 Journals', icon: <Grid2x2 className="w-3.5 h-3.5" /> },
-                { value: 'stats', label: 'Stat Advisor', icon: <FlaskConical className="w-3.5 h-3.5" /> },
+                { value: 'plotter', label: 'DE', icon: <Activity className="w-3.5 h-3.5" /> },
+                { value: 'gallery', label: '20 Figs', icon: <Grid2x2 className="w-3.5 h-3.5" /> },
+                { value: 'stats', label: 'Stats', icon: <FlaskConical className="w-3.5 h-3.5" /> },
+                { value: 'workbench', label: 'Lab', icon: <Calculator className="w-3.5 h-3.5" /> },
+                { value: 'composer', label: 'Board', icon: <LayoutGrid className="w-3.5 h-3.5" /> },
               ]}
             />
           </div>
@@ -1327,6 +1554,30 @@ export function App() {
                   </div>
                 )}
               </>
+            ) : studio === 'workbench' ? (
+              <div className="space-y-3">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+                  Power &amp; Wet-Lab Workbench
+                </div>
+                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                  A priori sample-size &amp; power curves (NIH/IACUC ready), Two-Way Factorial ANOVA, longitudinal growth curves, qPCR ΔΔCt, ELISA 4PL standard curves, and Michaelis–Menten enzyme kinetics.
+                </p>
+                <div className="p-3 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-hairline)] text-[11px] text-[var(--text-secondary)]">
+                  All journal presets, CVD palettes, fonts, transparent background, and SVG/PDF/PNG/TIFF exports below apply live to every workbench figure.
+                </div>
+              </div>
+            ) : studio === 'composer' ? (
+              <div className="space-y-3">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+                  Multi-Panel Figure Composer
+                </div>
+                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                  Pin plots from any BioGrace studio or upload microscopy / Western blot images to assemble journal-aligned multi-panel figures (a, b, c, d).
+                </p>
+                <div className="p-3 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-hairline)] text-[11px] text-[var(--text-secondary)]">
+                  Active Board: <strong>{composerPanels.length} pinned panel{composerPanels.length === 1 ? '' : 's'}</strong> · Target width: <strong>{resolvedTheme.widthMm} mm</strong> ({resolvedTheme.journal.shortName}).
+                </div>
+              </div>
             ) : (
               <>
                 {/* Studio 2 Wet-Lab Demos */}
@@ -1693,8 +1944,18 @@ export function App() {
           <section className="space-y-5 min-w-0">
             {/* Persistent Uploaded File Status Strip (Shows clearly whenever a custom CSV is active) */}
             {(() => {
-              const activeUpload = studio === 'stats' ? statsUploadStatus : deUploadStatus;
-              if (studio === 'gallery' || !activeUpload.isCustom) return null;
+              const galleryUpload = studio === 'gallery' ? galleryTables[activeCase.id] : undefined;
+              const activeUpload =
+                studio === 'stats'
+                  ? statsUploadStatus
+                  : studio === 'gallery'
+                  ? {
+                      fileName: galleryUpload?.fileName ?? '',
+                      rowCount: galleryUpload?.table.rows.length ?? 0,
+                      isCustom: Boolean(galleryUpload),
+                    }
+                  : deUploadStatus;
+              if (studio === 'workbench' || studio === 'composer' || !activeUpload.isCustom) return null;
               return (
                 <div className="rounded-2xl px-4 py-2.5 bg-emerald-500/12 border border-emerald-500/30 flex flex-wrap items-center justify-between gap-2 text-xs">
                   <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300 font-semibold min-w-0">
@@ -1709,11 +1970,22 @@ export function App() {
                       onPointerDown={() => fileInputRef.current?.click()}
                       className="apple-press text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-700 dark:text-emerald-300"
                     >
-                      Replace CSV
+                      Replace File
                     </button>
                     <button
                       type="button"
-                      onPointerDown={handleResetDemo}
+                      onPointerDown={() => {
+                        if (studio === 'gallery') {
+                          setGalleryTables((prev) => {
+                            const copy = { ...prev };
+                            delete copy[activeCase.id];
+                            return copy;
+                          });
+                          notifyUpload('success', 'Restored Journal Figure Demo', `Reset ${activeCase.title} back to its built-in biological showcase.`);
+                        } else {
+                          handleResetDemo();
+                        }
+                      }}
                       className="apple-press inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                     >
                       <RotateCcw className="w-3 h-3" />
@@ -1732,6 +2004,10 @@ export function App() {
                     ? 'DE & Single-Cell Publication Plotter'
                     : studio === 'gallery'
                     ? galleryTitles[activeCase.id]?.title ?? activeCase.title
+                    : studio === 'workbench'
+                    ? 'Power, Factorial & Wet-Lab Workbench'
+                    : studio === 'composer'
+                    ? 'Multi-Panel Figure Composer'
                     : "Biologist's Statistical Advisor & Anti-Barplot Studio"}
                 </h1>
                 <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-1 tabular-nums">
@@ -1741,7 +2017,7 @@ export function App() {
                 </p>
               </div>
 
-              {/* Export Buttons */}
+              {/* Export & Pin Buttons */}
               <div className="flex flex-wrap items-center gap-2">
                 {studio === 'stats' && (
                   <button
@@ -1766,6 +2042,18 @@ export function App() {
                   </button>
                 )}
 
+                {studio !== 'composer' && (
+                  <button
+                    type="button"
+                    title="Pin a crisp vector snapshot of this plot into the Multi-Panel Figure Composer"
+                    onPointerDown={handlePinActiveToComposer}
+                    className="apple-press inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-[var(--accent)]/12 text-[var(--accent)] border border-[var(--accent)]/30 hover:bg-[var(--accent)]/20"
+                  >
+                    <Pin className="w-3.5 h-3.5" />
+                    Pin to Board
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onPointerDown={() => {
@@ -1775,7 +2063,7 @@ export function App() {
                   className="apple-press inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-[var(--bg-elevated)] border border-[var(--border-hairline)] shadow-xs hover:border-[var(--accent)]"
                 >
                   <Download className="w-3.5 h-3.5 text-[var(--accent)]" />
-                  Vector SVG
+                  SVG
                 </button>
 
                 <button
@@ -1787,7 +2075,7 @@ export function App() {
                   className="apple-press inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-[var(--bg-elevated)] border border-[var(--border-hairline)] shadow-xs hover:border-[var(--accent)]"
                 >
                   <Layers className="w-3.5 h-3.5 text-rose-500" />
-                  Vector PDF
+                  PDF
                 </button>
 
                 <button
@@ -1799,7 +2087,20 @@ export function App() {
                   className="apple-press inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-[var(--bg-elevated)] border border-[var(--border-hairline)] shadow-xs hover:border-[var(--accent)]"
                 >
                   <ImageIcon className="w-3.5 h-3.5 text-emerald-500" />
-                  {activeStyle.dpi} DPI PNG
+                  {activeStyle.dpi} PNG
+                </button>
+
+                <button
+                  type="button"
+                  title="Download 600 DPI 32-bit RGBA TIFF with embedded print DPI tags (PLOS / eLife / JBC / ACS)"
+                  onPointerDown={() => {
+                    void exportTiffFile(svgRef.current, generatedCode.baseName, 600);
+                    playAppleTick(soundEnabled, 'commit');
+                  }}
+                  className="apple-press inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-[var(--bg-elevated)] border border-[var(--border-hairline)] shadow-xs hover:border-[var(--accent)]"
+                >
+                  <ImageIcon className="w-3.5 h-3.5 text-amber-500" />
+                  600 TIFF
                 </button>
 
                 <input
@@ -1834,22 +2135,37 @@ export function App() {
               </div>
             </div>
 
+            {/* 1-Click Colorblindness Simulator (CVD Proof) & Journal Preflight Guard */}
+            <CvdPreflightBar
+              cvdMode={cvdMode}
+              onChangeCvdMode={setCvdMode}
+              styleSettings={activeStyle}
+              darkMode={darkMode}
+              svgRef={svgRef}
+              soundEnabled={soundEnabled}
+              onAutoFixJournal={(patch) => {
+                patchActiveStyle(patch);
+                notifyUpload('success', `Auto-Fixed for ${resolvedTheme.journal.shortName}`, 'Applied print-ready white canvas, legible font size, CVD-safe palette, and ≥600 DPI.');
+              }}
+            />
+
             {/* Interactive Publication Figure Card (Click any title or axis to edit inline) */}
             <motion.div
-              key={`${studio}-${studio === 'plotter' ? deConfig.plotType : studio === 'gallery' ? activeCase.id : statsConfig.plotType}`}
+              key={`${studio}-${studio === 'plotter' ? deConfig.plotType : studio === 'gallery' ? activeCase.id : studio === 'workbench' ? workbenchSubTab : studio === 'composer' ? 'board' : statsConfig.plotType}`}
               initial={{ opacity: 0.72, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={APPLE_SPRINGS.criticallyDamped}
               className="relative material-card rounded-3xl p-3 sm:p-5"
-              style={
-                activeStyle.transparentBg
+              style={{
+                ...(activeStyle.transparentBg
                   ? {
                       backgroundImage:
                         'repeating-conic-gradient(rgba(128,128,128,0.12) 0% 25%, transparent 0% 50%)',
                       backgroundSize: '16px 16px',
                     }
-                  : undefined
-              }
+                  : {}),
+                filter: cvdMode !== 'none' ? `url(#biograce-cvd-${cvdMode})` : undefined,
+              }}
             >
               {/* Inline Floating Glass Plot Text Editor */}
               <InlinePlotEditor
@@ -1934,9 +2250,29 @@ export function App() {
                 </div>
               </div>
 
-              {studio === 'gallery' ? (
+              {studio === 'workbench' ? (
+                <WetLabWorkbench
+                  activeSubTab={workbenchSubTab}
+                  onChangeSubTab={setWorkbenchSubTab}
+                  styleSettings={deConfig}
+                  darkMode={darkMode}
+                  soundEnabled={soundEnabled}
+                  svgRef={svgRef}
+                  onSendQpcrToStats={(tidyCsv, fname) => ingestCsvText(tidyCsv, fname, 'stats-tidy')}
+                />
+              ) : studio === 'composer' ? (
+                <FigureComposerStudio
+                  panels={composerPanels}
+                  onChangePanels={setComposerPanels}
+                  styleSettings={deConfig}
+                  darkMode={darkMode}
+                  soundEnabled={soundEnabled}
+                  svgRef={svgRef}
+                />
+              ) : studio === 'gallery' ? (
                 <JournalCaseRenderer
                   item={activeCase}
+                  customTable={galleryTables[activeCase.id]?.table ?? null}
                   customTitle={galleryTitles[activeCase.id]?.title}
                   customSubtitle={galleryTitles[activeCase.id]?.subtitle}
                   styleSettings={deConfig}
@@ -2367,6 +2703,65 @@ export function App() {
               setStudio('gallery');
               setActiveCaseId(caseId);
               setCsvGuideOpen(false);
+            }}
+          />
+        </FluidSheet>
+
+        {/* Excel Paste, .xlsx Workbook & Visual Column Mapper Sheet */}
+        <FluidSheet
+          open={mapperSheetOpen}
+          onClose={() => setMapperSheetOpen(false)}
+          title="Excel / Prism Paste & Visual Column Mapper"
+          subtitle="Paste copied spreadsheet cells, upload multi-sheet .xlsx workbooks, or map arbitrary column names"
+          soundEnabled={soundEnabled}
+        >
+          <DataImportMapperModal
+            initialText={mapperInitText}
+            initialFilename={mapperInitName}
+            currentPlot={deConfig.plotType}
+            currentStudio={studio === 'stats' ? 'stats' : studio === 'gallery' ? 'gallery' : 'plotter'}
+            soundEnabled={soundEnabled}
+            onCommitMappedCsv={(csv, name, target) => {
+              ingestCsvText(csv, name, target);
+              setMapperSheetOpen(false);
+            }}
+          />
+        </FluidSheet>
+
+        {/* Local Manuscript Project Workspace Sheet */}
+        <FluidSheet
+          open={projectSheetOpen}
+          onClose={() => setProjectSheetOpen(false)}
+          title="Manuscript Figure Workspace"
+          subtitle="Save Fig 1A–F locally in your browser · Pin snapshots to the Multi-Panel Figure Composer"
+          soundEnabled={soundEnabled}
+        >
+          <ManuscriptProjectDrawer
+            figures={savedFigures}
+            composerPanels={composerPanels}
+            soundEnabled={soundEnabled}
+            onSaveCurrentFigure={handleSaveSnapshotToWorkspace}
+            onPinSavedToComposer={(rec) => {
+              setComposerPanels((prev) =>
+                [
+                  ...prev,
+                  {
+                    id: `pin-${Date.now()}`,
+                    label: `${rec.tag}: ${rec.title}`,
+                    kind: 'biograce-svg' as const,
+                    dataUrl: rec.previewDataUrl,
+                    aspectRatio: 1.5,
+                  },
+                ].slice(0, 6)
+              );
+              setStudio('composer');
+              setProjectSheetOpen(false);
+            }}
+            onDeleteFigure={(id) => setSavedFigures((prev) => prev.filter((f) => f.id !== id))}
+            onImportProject={(proj: BioGraceProjectFile) => {
+              setSavedFigures(proj.figures ?? []);
+              if (Array.isArray(proj.composerPanels)) setComposerPanels(proj.composerPanels);
+              notifyUpload('success', `Imported Project: ${proj.name}`, `Restored ${proj.figures.length} figures and ${proj.composerPanels?.length ?? 0} composer panels.`);
             }}
           />
         </FluidSheet>
