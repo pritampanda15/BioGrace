@@ -22,6 +22,8 @@ import {
   Lock,
   Moon,
   Palette,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pencil,
   Pin,
   RotateCcw,
@@ -182,6 +184,7 @@ export function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [codeSheetOpen, setCodeSheetOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [csvGuideOpen, setCsvGuideOpen] = useState(false);
   const [mapperSheetOpen, setMapperSheetOpen] = useState(false);
   const [projectSheetOpen, setProjectSheetOpen] = useState(false);
@@ -1190,11 +1193,25 @@ export function App() {
           )}
         </AnimatePresence>
 
-        {/* Floating Apple Translucent Toolbar */}
+        {/* Clean Single-Line macOS Translucent Titlebar */}
         <header className="sticky top-0 z-30 material-toolbar">
-          <div className="max-w-[1460px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-xl overflow-hidden shadow-sm shrink-0">
+          <div className="w-full px-4 sm:px-5 h-14 flex items-center justify-between gap-3">
+            {/* Left: Sidebar Toggle + Brand */}
+            <div className="flex items-center gap-2.5 shrink-0">
+              <button
+                type="button"
+                aria-label={sidebarOpen ? 'Hide Inspector sidebar' : 'Show Inspector sidebar'}
+                title={sidebarOpen ? 'Hide Inspector (maximize figure canvas)' : 'Show Inspector sidebar'}
+                onPointerDown={() => {
+                  setSidebarOpen((v) => !v);
+                  playAppleTick(soundEnabled, 'select');
+                }}
+                className="apple-press hidden lg:inline-flex p-1.5 rounded-lg bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              >
+                {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+              </button>
+
+              <div className="w-8 h-8 rounded-lg overflow-hidden shadow-sm shrink-0">
                 <svg viewBox="0 0 64 64" fill="none" className="w-full h-full" aria-hidden="true">
                   <defs>
                     <linearGradient id="biograce-brand-grad" x1="0" y1="0" x2="0" y2="64" gradientUnits="userSpaceOnUse">
@@ -1215,27 +1232,23 @@ export function App() {
                   <circle cx="46" cy="37" r="5.5" fill="#E0F2FE" />
                 </svg>
               </div>
-              <div className="truncate">
-                <div className="flex items-center gap-2">
-                  <span className="type-title text-base font-bold tracking-tight">BioGrace</span>
-                  <button
-                    type="button"
-                    onPointerDown={() => {
-                      setLicenseSheetOpen(true);
-                      playAppleTick(soundEnabled, 'select');
-                    }}
-                    className="apple-press hidden md:inline-block text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
-                  >
-                    Academic Only
-                  </button>
-                </div>
-                <p className="hidden sm:block text-[11px] text-[var(--text-tertiary)] truncate">
-                  Zero-friction figures, honest statistics &amp; reproducible R / Python / CLI
-                </p>
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span className="type-title text-[15px] font-bold tracking-tight">BioGrace</span>
+                <button
+                  type="button"
+                  onPointerDown={() => {
+                    setLicenseSheetOpen(true);
+                    playAppleTick(soundEnabled, 'select');
+                  }}
+                  className="apple-press hidden 2xl:inline-block text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 whitespace-nowrap"
+                >
+                  Academic
+                </button>
               </div>
             </div>
 
-            <div className="hidden lg:block">
+            {/* Center: 5-Studio Segmented Switcher */}
+            <div className="hidden lg:flex items-center justify-center min-w-0">
               <AppleSegmentedControl<StudioMode>
                 layoutId="studio-nav-pill"
                 size="sm"
@@ -1272,7 +1285,8 @@ export function App() {
               />
             </div>
 
-            <div className="flex items-center gap-1.5">
+            {/* Right: Grouped Single-Line Toolbar Actions */}
+            <div className="flex items-center gap-2 shrink-0">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -1284,78 +1298,86 @@ export function App() {
                   e.target.value = '';
                 }}
               />
-              <button
-                type="button"
-                title="Browse CSV schemas & sample data for all 36 plots"
-                onPointerDown={() => {
-                  setCsvGuideOpen(true);
-                  playAppleTick(soundEnabled, 'select');
-                }}
-                className="apple-press inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-primary)]"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500" />
-                <span className="hidden xl:inline">CSV Guide</span>
-              </button>
+
+              {/* Unified Data Pill Group (Upload | Excel | Guide) */}
+              <div className="inline-flex items-center rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-hairline)] p-0.5 divide-x divide-[var(--border-hairline)]">
+                <button
+                  type="button"
+                  title="Upload CSV, TSV, or Excel (.xlsx) file"
+                  onPointerDown={() => fileInputRef.current?.click()}
+                  className={`apple-press inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap ${
+                    (studio === 'stats'
+                      ? statsUploadStatus.isCustom
+                      : studio === 'gallery'
+                      ? Boolean(galleryTables[activeCase.id])
+                      : deUploadStatus.isCustom)
+                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                      : 'hover:bg-[var(--bg-elevated)] text-[var(--text-primary)]'
+                  }`}
+                >
+                  {(studio === 'stats'
+                    ? statsUploadStatus.isCustom
+                    : studio === 'gallery'
+                    ? Boolean(galleryTables[activeCase.id])
+                    : deUploadStatus.isCustom) ? (
+                    <Check className="w-3.5 h-3.5 shrink-0" />
+                  ) : (
+                    <Upload className="w-3.5 h-3.5 shrink-0" />
+                  )}
+                  <span className="hidden sm:inline max-w-[96px] truncate">
+                    {studio === 'stats' && statsUploadStatus.isCustom
+                      ? statsUploadStatus.fileName
+                      : studio === 'gallery' && galleryTables[activeCase.id]
+                      ? galleryTables[activeCase.id]!.fileName
+                      : deUploadStatus.isCustom
+                      ? deUploadStatus.fileName
+                      : 'Upload'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  title="Paste from Excel / Prism, import .xlsx, or map columns"
+                  onPointerDown={() => {
+                    setMapperSheetOpen(true);
+                    playAppleTick(soundEnabled, 'select');
+                  }}
+                  className="apple-press inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium whitespace-nowrap hover:bg-[var(--bg-elevated)] text-[var(--text-primary)]"
+                >
+                  <ClipboardPaste className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
+                  <span className="hidden xl:inline">Excel</span>
+                </button>
+
+                <button
+                  type="button"
+                  title="Browse CSV schemas & sample data for all 36 plots"
+                  onPointerDown={() => {
+                    setCsvGuideOpen(true);
+                    playAppleTick(soundEnabled, 'select');
+                  }}
+                  className="apple-press inline-flex items-center gap-1.5 px-2.5 py-1 rounded-r-lg text-xs font-medium whitespace-nowrap hover:bg-[var(--bg-elevated)] text-[var(--text-primary)]"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span className="hidden xl:inline">Guide</span>
+                </button>
+              </div>
 
               <button
                 type="button"
-                title="Paste from Excel / Prism, import .xlsx, or map arbitrary column headers"
-                onPointerDown={() => {
-                  setMapperSheetOpen(true);
-                  playAppleTick(soundEnabled, 'select');
-                }}
-                className="apple-press inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-primary)]"
-              >
-                <ClipboardPaste className="w-3.5 h-3.5 text-[var(--accent)]" />
-                <span className="hidden xl:inline">Excel / Map</span>
-              </button>
-
-              <button
-                type="button"
-                title="Manage saved manuscript figures (Fig 1A, Fig 1B, etc.) locally"
+                title="Saved manuscript figures (Fig 1A, Fig 1B, etc.)"
                 onPointerDown={() => {
                   setProjectSheetOpen(true);
                   playAppleTick(soundEnabled, 'select');
                 }}
-                className="apple-press inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-primary)]"
+                className="apple-press inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-primary)]"
               >
-                <FolderKanban className="w-3.5 h-3.5 text-amber-500" />
-                <span className="hidden xl:inline">
-                  Workspace{savedFigures.length > 0 ? ` (${savedFigures.length})` : ''}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onPointerDown={() => fileInputRef.current?.click()}
-                className={`apple-press inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium ${
-                  (studio === 'stats'
-                    ? statsUploadStatus.isCustom
-                    : studio === 'gallery'
-                    ? Boolean(galleryTables[activeCase.id])
-                    : deUploadStatus.isCustom)
-                    ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/35'
-                    : 'bg-[var(--bg-subtle)] hover:bg-[var(--border-hairline)] text-[var(--text-primary)]'
-                }`}
-              >
-                {(studio === 'stats'
-                  ? statsUploadStatus.isCustom
-                  : studio === 'gallery'
-                  ? Boolean(galleryTables[activeCase.id])
-                  : deUploadStatus.isCustom) ? (
-                  <Check className="w-3.5 h-3.5" />
-                ) : (
-                  <Upload className="w-3.5 h-3.5" />
+                <FolderKanban className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <span className="hidden 2xl:inline">Workspace</span>
+                {savedFigures.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 tabular-nums">
+                    {savedFigures.length}
+                  </span>
                 )}
-                <span className="hidden sm:inline max-w-[115px] truncate">
-                  {studio === 'stats' && statsUploadStatus.isCustom
-                    ? statsUploadStatus.fileName
-                    : studio === 'gallery' && galleryTables[activeCase.id]
-                    ? galleryTables[activeCase.id]!.fileName
-                    : deUploadStatus.isCustom
-                    ? deUploadStatus.fileName
-                    : 'Upload'}
-                </span>
               </button>
 
               <button
@@ -1364,9 +1386,9 @@ export function App() {
                   setCodeSheetOpen(true);
                   playAppleTick(soundEnabled, 'select');
                 }}
-                className="apple-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[var(--accent)] text-white shadow-sm"
+                className="apple-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap bg-[var(--accent)] text-white shadow-sm"
               >
-                <Code2 className="w-3.5 h-3.5" />
+                <Code2 className="w-3.5 h-3.5 shrink-0" />
                 <span className="hidden md:inline">Code</span>
               </button>
 
@@ -1375,7 +1397,7 @@ export function App() {
                 aria-label="Toggle tactile audio"
                 title={soundEnabled ? 'Tactile audio on' : 'Tactile audio muted'}
                 onPointerDown={() => setSoundEnabled((s) => !s)}
-                className="apple-press p-2 rounded-xl bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                className="apple-press p-1.5 rounded-lg bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               >
                 {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
               </button>
@@ -1384,7 +1406,7 @@ export function App() {
                 type="button"
                 aria-label="Toggle light and dark theme"
                 onPointerDown={() => setDarkMode((d) => !d)}
-                className="apple-press p-2 rounded-xl bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                className="apple-press p-1.5 rounded-lg bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               >
                 {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </button>
@@ -1410,10 +1432,28 @@ export function App() {
           </div>
         </header>
 
-        {/* Main Workbench */}
-        <main className="flex-1 max-w-[1460px] w-full mx-auto px-4 sm:px-6 py-5 grid grid-cols-1 lg:grid-cols-[356px_minmax(0,1fr)] gap-6 items-start">
-          {/* LEFT INSPECTOR SIDEBAR */}
-          <aside className="material-sidebar rounded-3xl border p-5 space-y-5 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6.2rem)] lg:overflow-y-auto">
+        {/* Full-Width macOS Split-View Workbench: Docked Slate Inspector + Expansive Main Canvas */}
+        <main className="flex-1 w-full flex flex-col lg:flex-row items-stretch">
+          {/* LEFT DOCKED INSPECTOR SIDEBAR (Distinct Slate Surface + Collapsible) */}
+          {sidebarOpen && (
+            <aside className="material-sidebar w-full lg:w-[332px] lg:shrink-0 border-b lg:border-b-0 lg:border-r border-[var(--border-hairline)] p-4 sm:p-5 space-y-5 lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:overflow-y-auto">
+              <div className="flex items-center justify-between pb-2.5 border-b border-[var(--border-hairline)]">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+                  Inspector &amp; Styling
+                </span>
+                <button
+                  type="button"
+                  onPointerDown={() => {
+                    setSidebarOpen(false);
+                    playAppleTick(soundEnabled, 'select');
+                  }}
+                  className="apple-press hidden lg:inline-flex items-center gap-1 text-[11px] font-medium text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
+                  title="Hide Inspector to maximize canvas"
+                >
+                  <PanelLeftClose className="w-3.5 h-3.5" />
+                  Hide
+                </button>
+              </div>
             {studio === 'gallery' ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -2120,9 +2160,11 @@ export function App() {
               </div>
             </div>
           </aside>
+          )}
 
-          {/* MAIN STAGE */}
-          <section className="space-y-5 min-w-0">
+          {/* MAIN STUDIO STAGE (Expansive Full-Bleed Canvas) */}
+          <section className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-5">
+            <div className="max-w-[1480px] mx-auto space-y-4">
             {/* Persistent Uploaded File Status Strip (Shows clearly whenever a custom CSV is active) */}
             {(() => {
               const galleryUpload = studio === 'gallery' ? galleryTables[activeCase.id] : undefined;
@@ -2355,7 +2397,8 @@ export function App() {
                 onClose={() => setActivePlotEdit(null)}
               />
 
-              {/* Subtle Quick-Edit Hint Bar (outside exported SVG) */}
+              {/* Subtle Quick-Edit Hint Bar (only for studios with inline click-to-edit text) */}
+              {studio !== 'composer' && studio !== 'workbench' && (
               <div className="mb-2.5 px-1 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[var(--text-tertiary)]">
                 <span className="flex items-center gap-1.5">
                   <Pencil className="w-3 h-3 text-[var(--accent)]" />
@@ -2430,6 +2473,7 @@ export function App() {
                   )}
                 </div>
               </div>
+              )}
 
               {studio === 'workbench' ? (
                 <WetLabWorkbench
@@ -2741,12 +2785,13 @@ export function App() {
               </div>
               </>
             )}
+            </div>
           </section>
         </main>
 
         {/* Minimal Public Launch Footer with Privacy Lock & Feedback Links */}
-        <footer className="mt-6 border-t border-[var(--border-hairline)] bg-[var(--bg-elevated)]/60">
-          <div className="max-w-[1460px] mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3 text-[11px] text-[var(--text-tertiary)]">
+        <footer className="border-t border-[var(--border-hairline)] bg-[var(--bg-elevated)]/80">
+          <div className="w-full px-5 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3 text-[11px] text-[var(--text-tertiary)]">
             <div className="flex flex-wrap items-center gap-3">
               <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-400">
                 <Lock className="w-3.5 h-3.5" />

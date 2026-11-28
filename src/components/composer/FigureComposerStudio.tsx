@@ -128,11 +128,11 @@ export const FigureComposerStudio: React.FC<FigureComposerStudioProps> = ({
   const rows = grid === '2x1' ? 1 : 2;
   const totalSlots = cols * rows;
 
-  const W = 1080;
-  const padX = 28;
-  const padTop = 52;
-  const padBottom = 24;
-  const gap = 22;
+  const W = 1120;
+  const padX = 16;
+  const padTop = figureTitle.trim() ? 46 : 18;
+  const padBottom = 16;
+  const gap = 16;
   const cellW = (W - padX * 2 - gap * (cols - 1)) / cols;
   const cellH = Math.round(cellW * (2 / 3));
   const H = padTop + rows * cellH + (rows - 1) * gap + padBottom;
